@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OOH Campaign Performance Analyzer</title>
+<meta name="description" content="Finds under-delivering out-of-home advertising inventory continuously, rather than at end of campaign. Built in Python and SQL by Muhammad Ahsan Sheikh.">
+<meta name="theme-color" content="#0d1117">
+<meta property="og:title" content="OOH Campaign Performance Analyzer">
+<meta property="og:description" content="Finds under-delivering advertising inventory continuously instead of at end of campaign. Python, pandas, SQL.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23ff7a45'/><text y='70' x='50' text-anchor='middle' font-size='54' font-weight='bold' font-family='Helvetica,Arial' fill='%230d1117'>OA</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="bar">
+  <div class="barin">
+    <div class="brand">
+      <div class="logo">OA</div>
+      <div class="brandtext">
+        <div class="nm">OOH Campaign Performance Analyzer</div>
+        <div class="sb">Delivery reconciliation &middot; synthetic dataset</div>
+      </div>
+    </div>
+    <nav class="barlinks">
+      <a class="hide-sm" href="https://github.com/muhammadahsan-30" target="_blank" rel="noopener">Source</a>
+      <a class="cta" href="../index.html">← Portfolio</a>
+    </nav>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <p class="synthetic">
+    <span class="ico">i</span>
+    <span><b>All data on this page is synthetic.</b> Generated from a model of how out-of-home
+    advertising is structured, with a fixed random seed so results are reproducible. No real
+    agency or client data is used anywhere in this project, and the brand names are invented.
+    The model is built on Canadian OOH market parameters — CMA populations, Canadian format
+    names and rate cards drawn from published market benchmarks — and all figures are in CAD.</span>
+  </p>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="toolbar">
+    <div class="fg"><label for="fClient">Client</label>
+      <select id="fClient"><option value="">All clients</option></select></div>
+    <div class="fg"><label for="fCity">City</label>
+      <select id="fCity"><option value="">All cities</option></select></div>
+    <div class="fg"><label for="fFormat">Format</label>
+      <select id="fFormat"><option value="">All formats</option></select></div>
+    <button id="reset" type="button">Reset</button>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><span class="idx">01</span><h2>Under-delivering placements</h2>
+      <span class="hint">worst first · flagged below &minus;5%</span></div>
+    <p class="pnote">Variance is verified impressions against what the advertiser contracted for. This is the table that would otherwise be assembled by hand at end of campaign.</p>
+    <div class="tablewrap">
+      <table id="tWorst">
+        <thead><tr>
+          <th class="rank">#</th><th>Client</th><th>City</th><th>Format</th>
+          <th class="num">Contracted</th><th class="num">Delivered</th>
+          <th class="num">Variance</th><th class="num">Spend (CAD)</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="chartgrid">
+    <div class="panel">
+      <div class="phead"><span class="idx">02</span><h2>Delivery against plan</h2></div>
+      <div class="pbody"><div class="chartbox"><canvas id="cMonthly"></canvas></div></div>
+    </div>
+    <div class="panel">
+      <div class="phead"><span class="idx">03</span><h2>Cost efficiency by format</h2>
+        <span class="hint">lower is better</span></div>
+      <div class="pbody"><div class="chartbox"><canvas id="cFormat"></canvas></div></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><span class="idx">04</span><h2>Campaigns</h2>
+      <span class="hint">reach is modeled per market, then summed &middot; estimates</span></div>
+    <div class="tablewrap">
+      <table id="tCamp">
+        <thead><tr>
+          <th>Client</th><th>Objective</th><th class="num">Markets</th>
+          <th class="num">Placements</th><th class="num">Spend (CAD)</th>
+          <th class="num">Delivered</th><th class="num">Variance</th>
+          <th class="num">CPM</th><th class="num">Reach</th><th class="num">Freq.</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="lede">
+    <h2>Why this exists</h2>
+    <p>
+      Out-of-home advertising runs on <em>estimated</em> impressions. A bulletin does not know who
+      saw it. Sites go dark, posters get damaged, digital screens have downtime, and agencies
+      typically discover all of it by hand at end of campaign, during reconciliation.
+    </p>
+    <p>
+      I watched that reconciliation happen for five months from inside the agency, then built this.
+      It ranks under-delivering inventory continuously instead. The number that matters is
+      <em>spend at risk</em>: billed money attached to placements that did not deliver what was
+      contracted.
+    </p>
+  </div>
+
+  <div class="panel" id="howto">
+    <div class="phead"><span class="idx">05</span><h2>How to use this</h2>
+      <span class="hint">four steps, about a minute</span></div>
+    <ol class="steps">
+      <li><b>Read the KPI strip.</b> Two amber cards lead: how many placements breached the flag line, and what that shortfall is worth in billed spend. The rest give total spend tracked and impressions delivered against contracted.</li>
+      <li><b>Open panel 01.</b> Every placement delivering more than 5% below contract, worst first. In an agency this table is assembled by hand at end of campaign; here it is standing output.</li>
+      <li><b>Filter to a client or city.</b> The table and the count re-filter live. Pick a client and you have the reconciliation conversation for that account, ready to have.</li>
+      <li><b>Check panel 03 before renewing.</b> Cost per thousand by format, on verified rather than contracted delivery. This is which inventory type is actually efficient once you account for what really ran.</li>
+    </ol>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><span class="idx">06</span><h2>How it works</h2></div>
+    <div class="grid3">
+      <div class="tile">
+        <span class="tn">01 / DATA</span>
+        <h3>Normalized data model</h3>
+        <p>Four tables, sites and campaigns and placements and delivery, with enforced foreign keys. A placement joins a campaign to a site over a date window; delivery records what it achieved each day.</p>
+      </div>
+      <div class="tile">
+        <span class="tn">02 / METRICS</span>
+        <h3>Tested metrics layer</h3>
+        <p>Delivery variance, CPM, rate efficiency, GRP and a reach estimate. Each function does one thing and is unit-tested against inputs small enough to check by hand.</p>
+      </div>
+      <div class="tile">
+        <span class="tn">03 / SQL</span>
+        <h3>Analytical SQL</h3>
+        <p>CTEs and window functions. <code>ROW_NUMBER() OVER (PARTITION BY …)</code> to rank the worst sites inside each campaign, <code>LAG()</code> for month-over-month change per client.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><span class="idx">07</span><h2>Assumptions</h2>
+      <span class="hint">every figure here rests on these</span></div>
+    <dl id="assump" style="margin:0"></dl>
+  </div>
+
+  <p class="pnote" style="padding:0">
+    All out-of-home reach reporting rests on assumptions like these. The difference is that
+    these are written down where someone can argue with them.
+  </p>
+
+  <footer>
+    <span>Built by Muhammad Ahsan Sheikh &middot; Python · pandas · SQL · Chart.js</span>
+    <nav>
+      <a href="../index.html">Portfolio</a>
+      <a href="https://github.com/muhammadahsan-30" target="_blank" rel="noopener">Source</a>
+    </nav>
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
