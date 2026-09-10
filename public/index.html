@@ -23,11 +23,11 @@
       <div class="logo">OA</div>
       <div class="brandtext">
         <div class="nm">OOH Campaign Performance Analyzer</div>
-        <div class="sb">Delivery reconciliation &middot; synthetic dataset</div>
+        <div class="sb" id="brandsub">Delivery reconciliation &middot; synthetic dataset</div>
       </div>
     </div>
     <nav class="barlinks">
-      <a class="hide-sm" href="https://github.com/muhammadahsan-30" target="_blank" rel="noopener">Source</a>
+      <a class="hide-sm" href="https://github.com/muhammadahsan-30/ooh-campaign-analyzer" target="_blank" rel="noopener">Source</a>
       <a class="cta" href="../index.html">← Portfolio</a>
     </nav>
   </div>
@@ -43,6 +43,8 @@
     The model is built on Canadian OOH market parameters — CMA populations, Canadian format
     names and rate cards drawn from published market benchmarks — and all figures are in CAD.</span>
   </p>
+
+  <p class="asof" id="asof"></p>
 
   <div class="cards" id="cards"></div>
 
@@ -60,12 +62,13 @@
   <div class="panel">
     <div class="phead"><span class="idx">01</span><h2>Under-delivering placements</h2>
       <span class="hint">worst first · flagged below &minus;5%</span></div>
-    <p class="pnote">Variance is verified impressions against what the advertiser contracted for. This is the table that would otherwise be assembled by hand at end of campaign.</p>
+    <p class="pnote">Variance is verified impressions against contracted impressions <em>prorated to the days elapsed</em>, so a flight still in the air is judged on the days that have actually run — a healthy placement three weeks into a twelve weeks does not appear here. Rows marked <span class="pill live">LIVE</span> are still running and can still be fixed. This is the table that would otherwise be assembled by hand at end of campaign.</p>
     <div class="tablewrap">
       <table id="tWorst">
         <thead><tr>
           <th class="rank">#</th><th>Client</th><th>City</th><th>Format</th>
-          <th class="num">Contracted</th><th class="num">Delivered</th>
+          <th class="num">Flight</th>
+          <th class="num">Contracted to date</th><th class="num">Delivered</th>
           <th class="num">Variance</th><th class="num">Spend (CAD)</th>
         </tr></thead>
         <tbody></tbody>
@@ -82,19 +85,23 @@
       <div class="phead"><span class="idx">03</span><h2>Cost efficiency by format</h2>
         <span class="hint">lower is better</span></div>
       <div class="pbody"><div class="chartbox"><canvas id="cFormat"></canvas></div></div>
+      <p class="pnote">Read this <em>within</em> a format, not across it. A digital face rotates in a shared loop, so its impressions are a share of loop time rather than the exclusive presence a static bulletin holds for the whole flight — comparing the two CPMs head to head overstates static's efficiency.</p>
     </div>
   </div>
 
   <div class="panel">
     <div class="phead"><span class="idx">04</span><h2>Campaigns</h2>
       <span class="hint">reach is modeled per market, then summed &middot; estimates</span></div>
+    <p class="pnote">Spend, delivery and variance are all <em>to date</em>. <span class="pill live">LIVE</span> marks a campaign still in the air, with the days elapsed against the booked flight beside it. <em>Showing</em> is the daily showing level — daily impressions as a percentage of the combined population of the markets the campaign ran in, so a #50 showing is a market weight, not a flight total.</p>
     <div class="tablewrap">
       <table id="tCamp">
         <thead><tr>
-          <th>Client</th><th>Objective</th><th class="num">Markets</th>
+          <th>Client</th><th>Objective</th><th class="num">Flight</th>
+          <th class="num">Markets</th>
           <th class="num">Placements</th><th class="num">Spend (CAD)</th>
           <th class="num">Delivered</th><th class="num">Variance</th>
           <th class="num">CPM</th><th class="num">Reach</th><th class="num">Freq.</th>
+          <th class="num">Showing</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -110,9 +117,11 @@
     </p>
     <p>
       I watched that reconciliation happen for five months from inside the agency, then built this.
-      It ranks under-delivering inventory continuously instead. The number that matters is
-      <em>spend at risk</em>: billed money attached to placements that did not deliver what was
-      contracted.
+      It ranks under-delivering inventory <em>while the flight is still running</em>: every placement
+      is measured against its contracted impressions prorated to the days elapsed, so a live campaign
+      is judged on the days that have actually run rather than penalised for the ones that have not
+      happened yet. The number that matters is <em>spend at risk</em>: billed money attached to
+      placements that are behind what was contracted.
     </p>
   </div>
 
@@ -120,10 +129,10 @@
     <div class="phead"><span class="idx">05</span><h2>How to use this</h2>
       <span class="hint">four steps, about a minute</span></div>
     <ol class="steps">
-      <li><b>Read the KPI strip.</b> Two amber cards lead: how many placements breached the flag line, and what that shortfall is worth in billed spend. The rest give total spend tracked and impressions delivered against contracted.</li>
-      <li><b>Open panel 01.</b> Every placement delivering more than 5% below contract, worst first. In an agency this table is assembled by hand at end of campaign; here it is standing output.</li>
+      <li><b>Read the KPI strip.</b> Two amber cards lead: how many placements breached the flag line, and what that shortfall is worth in billed spend. The rest give spend billed to date, impressions delivered against contracted to date, and the discount achieved off rate card. Everything is measured to the as-of date above the strip.</li>
+      <li><b>Open panel 01.</b> Every placement more than 5% behind contract for the days that have run, worst first. Rows marked LIVE are still in the air — those are the ones worth a phone call, because there is still flight left to make the shortfall up in.</li>
       <li><b>Filter to a client or city.</b> The table and the count re-filter live. Pick a client and you have the reconciliation conversation for that account, ready to have.</li>
-      <li><b>Check panel 03 before renewing.</b> Cost per thousand by format, on verified rather than contracted delivery. This is which inventory type is actually efficient once you account for what really ran.</li>
+      <li><b>Check panel 03 before renewing.</b> Cost per thousand by format, on verified rather than contracted delivery. This is which inventory type is actually efficient once you account for what really ran — read within a format, not across, for the reason under the chart.</li>
     </ol>
   </div>
 
@@ -138,7 +147,7 @@
       <div class="tile">
         <span class="tn">02 / METRICS</span>
         <h3>Tested metrics layer</h3>
-        <p>Delivery variance, CPM, rate efficiency, GRP and a reach estimate. Each function does one thing and is unit-tested against inputs small enough to check by hand.</p>
+        <p>Prorated delivery variance, spend to date, CPM, rate efficiency, daily showing level and a reach estimate. Each function does one thing and is unit-tested against inputs small enough to check by hand — including the mid-flight case, where a healthy placement must not flag.</p>
       </div>
       <div class="tile">
         <span class="tn">03 / SQL</span>
@@ -163,7 +172,7 @@
     <span>Built by Muhammad Ahsan Sheikh &middot; Python · pandas · SQL · Chart.js</span>
     <nav>
       <a href="../index.html">Portfolio</a>
-      <a href="https://github.com/muhammadahsan-30" target="_blank" rel="noopener">Source</a>
+      <a href="https://github.com/muhammadahsan-30/ooh-campaign-analyzer" target="_blank" rel="noopener">Source</a>
     </nav>
   </footer>
 </div>

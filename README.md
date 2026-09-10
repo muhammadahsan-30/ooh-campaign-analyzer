@@ -4,6 +4,11 @@ Finds under-delivering out-of-home advertising inventory (bulletins, transit she
 mall panels) **while the campaign is still running** — instead of at the end, when the
 money is already spent.
 
+It does that by measuring every placement against its contracted impressions *prorated
+to the days elapsed*, so a live flight is judged on the days that have actually run.
+Without that, a healthy placement three weeks into a twelve-week flight reads as −75%
+and the tool only works on campaigns that are already over.
+
 **[▶ Open the live dashboard](https://muhammadahsan-30.github.io/analyzer/)** — no install, opens in the browser.
 
 Built by [Muhammad Ahsan Sheikh](https://muhammadahsan-30.github.io), Honours Mathematics
@@ -24,22 +29,30 @@ published market benchmarks — because that is the market these figures are for
 
 ## The result
 
-On the bundled synthetic dataset — 120 sites, 8 national campaigns, 563 placements,
-34,888 daily delivery records:
+On the bundled synthetic dataset — 120 sites, 8 national campaigns (five closed, **three
+still in flight**), 595 placements, 27,414 daily delivery records, measured as of
+2026-09-10:
 
 | Measure | Value |
 |---|---|
-| Media spend tracked | CAD 7.69m |
-| Impressions delivered | 537.2m of 552.5m contracted |
-| Placements more than 5% below contract | 57 (10.1%) |
-| Billed spend attached to that shortfall | CAD 207,923 |
-| Blended CPM | CAD 14.32 (verified delivery) |
+| Spend billed to date | CAD 5.41m |
+| Impressions delivered | 415.1m of 427.7m contracted to date |
+| Placements more than 5% behind contract to date | 61 (10.3%) |
+| Billed spend attached to that shortfall | CAD 152,435 |
+| Blended CPM | CAD 13.03 (verified delivery) |
+| Negotiated off rate card | 20.0% (spend-weighted) |
 
-The dashboard ranks the 57 flagged placements worst-first and filters to a single
-client, city or format. CPM is computed on verified rather than contracted delivery, by
-campaign, city and format, so a placement that under-delivered shows its real cost.
-Campaign reach is modelled per market and summed, landing at 54.7–88.5% across the eight
-campaigns.
+The dashboard ranks the 61 flagged placements worst-first, marks the ones still in the
+air, and filters to a single client, city or format. CPM is computed on verified rather
+than contracted delivery, by campaign, city and format, so a placement that
+under-delivered shows its real cost. Campaign reach is modelled per market and summed,
+landing at 33.6–86.0% across the eight campaigns, at daily showing levels of #5 to #7.
+
+**Why the proration matters.** Measured against the full booked flight instead of the
+days elapsed, 242 of 595 placements would flag — 181 of them healthy inventory blamed for
+days that have not happened yet — and the three live campaigns would read −74.4%, −50.1%
+and −26.2% rather than −4.5%, −4.8% and −3.1%. A unit test pins the case down: a healthy
+placement three weeks into a twelve-week flight must not flag.
 
 ## How to run it
 
@@ -51,7 +64,7 @@ cd ooh-campaign-analyzer
 pip install -r requirements.txt          # pandas, pytest
 python src/generate_data.py              # builds data/ooh.db (fixed seed, reproducible)
 python src/export_json.py                # writes public/data.json and public/data.js
-python -m pytest tests/ -q               # 10 tests
+python -m pytest tests/ -q               # 19 tests
 cd public && python -m http.server 8000  # open http://localhost:8000
 ```
 
@@ -64,7 +77,8 @@ it too).
 ```
 src/generate_data.py   synthetic data -> SQLite, fixed seed
 src/schema.sql         4 tables (sites, campaigns, placements, delivery), enforced foreign keys
-src/metrics.py         delivery variance, CPM, rate efficiency, GRP, reach/frequency
+src/metrics.py         prorated delivery variance, spend to date, CPM, rate efficiency,
+                       daily showing level, reach/frequency
                        one function each, all unit-tested on hand-checkable inputs
 src/export_json.py     runs the metrics, writes public/data.{json,js}
 src/queries.sql        standalone analytical SQL (CTEs, ROW_NUMBER / LAG window functions)
@@ -81,14 +95,21 @@ cover.
 populations, Canadian format names, rate cards from published market benchmarks) with a
 fixed random seed. All figures are in CAD. No real agency or client data is used
 anywhere, and the brand names are invented. Every modelling assumption — visibility
-factors, the reach curve, the injected under-delivery rate, the spend basis — is
-documented in [docs/assumptions.md](docs/assumptions.md).
+factors, the reach curve, the injected under-delivery rate, the spend basis, the
+straight-line proration — is documented in [docs/assumptions.md](docs/assumptions.md),
+along with what the tool deliberately does not do.
 
 ## What I would add next
 
+- A delivery curve instead of straight-line proration, so weekday/weekend and seasonal
+  weighting are respected rather than assumed flat
+- A threshold that widens when few days have elapsed. The −5% line is a hard cliff, and
+  early in a flight daily noise has not averaged out — that produces one false positive
+  in 595 here, documented rather than tuned away
+- A share-of-loop model for digital faces, so digital and static CPM become comparable
 - Attribution: join sales data to exposure windows for a real return-on-ad-spend figure
 - Deduplicated reach across cities for multi-market campaigns
-- Extend to 10–12 CMAs. At six markets the heaviest campaigns saturate the reach curve
-  in Tier 1 cities (see [docs/assumptions.md](docs/assumptions.md)); spreading the same
+- Extend to 10–12 CMAs. At six markets the heaviest campaign still saturates the reach
+  curve in Toronto (see [docs/assumptions.md](docs/assumptions.md)); spreading the same
   spend over ~24m people rather than 18m fixes it without tuning a constant
 - Share of voice by city and format against competitor bookings

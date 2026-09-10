@@ -7,12 +7,13 @@
 -- ============================================================================
 WITH placement_totals AS (
     SELECT p.placement_id, p.campaign_id,
-           -- negotiated_rate is a 4-week figure; prorate to the flight length so
-           -- spend matches the period impressions were delivered over (same basis
-           -- as src/export_json.py).
-           p.negotiated_rate * (julianday(p.end_date) - julianday(p.start_date)) / 30.0 AS spend,
-           SUM(d.verified_impressions)  AS delivered,
-           SUM(p.contracted_impressions) / COUNT(*) AS contracted
+           -- negotiated_rate is a four-week (28-day) figure. COUNT(*) is the
+           -- number of delivery rows, i.e. the days that have actually run, so
+           -- this bills the rate to date and matches metrics.spend_to_date().
+           -- Using the contracted flight length instead would over-bill any
+           -- campaign still in the air.
+           p.negotiated_rate * COUNT(*) / 28.0 AS spend,
+           SUM(d.verified_impressions)  AS delivered
     FROM placements p
     JOIN delivery d ON d.placement_id = p.placement_id
     GROUP BY p.placement_id
@@ -36,6 +37,13 @@ ORDER BY spend DESC;
 -- ============================================================================
 WITH placement_delivery AS (
     SELECT p.placement_id, p.campaign_id, p.site_id, p.contracted_impressions,
+           -- contracted_impressions covers the whole flight. COUNT(*) is the
+           -- days that have actually run, so prorating by it is what lets a
+           -- campaign still in the air be judged fairly -- otherwise a healthy
+           -- placement three weeks into a twelve-week flight reads as -75%.
+           -- Same basis as metrics.delivery_vs_contract().
+           p.contracted_impressions * COUNT(*)
+               / (julianday(p.end_date) - julianday(p.start_date)) AS contracted_to_date,
            SUM(d.verified_impressions) AS delivered
     FROM placements p
     JOIN delivery d ON d.placement_id = p.placement_id
@@ -43,17 +51,19 @@ WITH placement_delivery AS (
 ),
 scored AS (
     SELECT pd.*,
-           ROUND((pd.delivered - pd.contracted_impressions) * 100.0
-                 / pd.contracted_impressions, 1) AS variance_pct,
+           ROUND((pd.delivered - pd.contracted_to_date) * 100.0
+                 / pd.contracted_to_date, 1) AS variance_pct,
            ROW_NUMBER() OVER (
                PARTITION BY pd.campaign_id
-               ORDER BY (pd.delivered - pd.contracted_impressions) * 1.0
-                        / pd.contracted_impressions
+               ORDER BY (pd.delivered - pd.contracted_to_date) * 1.0
+                        / pd.contracted_to_date
            ) AS rank_in_campaign
     FROM placement_delivery pd
 )
 SELECT c.client_name, s.campaign_id, s.site_id, si.city, si.format,
-       s.contracted_impressions, s.delivered, s.variance_pct
+       ROUND(s.contracted_to_date) AS contracted_to_date,
+       s.contracted_impressions AS contracted_full_flight,
+       s.delivered, s.variance_pct
 FROM scored s
 JOIN campaigns c ON c.campaign_id = s.campaign_id
 JOIN sites si    ON si.site_id    = s.site_id
@@ -68,9 +78,9 @@ ORDER BY s.campaign_id, s.rank_in_campaign;
 -- ============================================================================
 WITH daily AS (
     SELECT p.campaign_id, d.date,
-           -- negotiated_rate / 30 is the daily rate; summed over the flight this
-           -- is the same prorated basis used in query 1 and src/export_json.py.
-           SUM(p.negotiated_rate / 30.0) AS day_spend
+           -- negotiated_rate / 28 is the daily rate. Summed over the days that
+           -- ran, this is the same basis used in query 1 and metrics.py.
+           SUM(p.negotiated_rate / 28.0) AS day_spend
     FROM delivery d
     JOIN placements p ON p.placement_id = d.placement_id
     GROUP BY p.campaign_id, d.date
@@ -86,8 +96,8 @@ ORDER BY campaign_id, date;
 -- ============================================================================
 WITH pt AS (
     SELECT p.placement_id, p.site_id,
-           -- prorate the 4-week rate to the flight length (see query 1)
-           p.negotiated_rate * (julianday(p.end_date) - julianday(p.start_date)) / 30.0 AS spend,
+           -- prorate the four-week (28-day) rate to the days that ran (query 1)
+           p.negotiated_rate * COUNT(*) / 28.0 AS spend,
            SUM(d.verified_impressions) AS delivered
     FROM placements p
     JOIN delivery d ON d.placement_id = p.placement_id
@@ -109,7 +119,10 @@ ORDER BY cpm ASC;
 --    Answers "which inventory actually performs when we rebook it?"
 -- ============================================================================
 WITH pt AS (
-    SELECT p.site_id, p.campaign_id, p.contracted_impressions,
+    SELECT p.site_id, p.campaign_id,
+           -- prorated to the days that ran, as in query 2
+           p.contracted_impressions * COUNT(*)
+               / (julianday(p.end_date) - julianday(p.start_date)) AS contracted_to_date,
            SUM(d.verified_impressions) AS delivered
     FROM placements p
     JOIN delivery d ON d.placement_id = p.placement_id
@@ -117,7 +130,7 @@ WITH pt AS (
 )
 SELECT s.site_id, s.city, s.format,
        COUNT(DISTINCT pt.campaign_id) AS campaigns_booked,
-       ROUND(AVG(pt.delivered * 100.0 / pt.contracted_impressions), 1) AS avg_delivery_pct
+       ROUND(AVG(pt.delivered * 100.0 / pt.contracted_to_date), 1) AS avg_delivery_pct
 FROM pt
 JOIN sites s ON s.site_id = pt.site_id
 GROUP BY s.site_id

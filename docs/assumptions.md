@@ -23,7 +23,10 @@ are meant to speak to:
 - **Currency** is CAD everywhere.
 - **Scale.** The eight campaigns are national buys for blue-chip clients, each booking
   most of the 120-site inventory (sites are rebooked across campaigns, as in practice).
-  On the current dataset that is 563 placements and CAD 7.69m of tracked spend.
+  On the current dataset that is 595 placements and CAD 5.41m of spend billed to date.
+- **Five campaigns have closed, three are still in the air** on the as-of date. The live
+  ones are caught at roughly a quarter, a half and three quarters of the way through
+  their flights, so the prorated comparison below is exercised rather than assumed.
 - **Inventory allocation** is strictly proportional to CMA population (largest
   remainder), not drawn at random. A random draw left small markets over-weighted —
   Calgary held 1.41x its population share — which inflated their modelled reach.
@@ -37,15 +40,15 @@ site's rate is one draw from the band for its format:
 
 | Format | 4-week rate card (CAD) | Notes |
 |---|---|---|
-| Bulletin | 1,500 – 12,000 | Low end suburban / secondary market, high end urban static |
-| Digital screen | 12,000 – 25,000 | Premium, large-format digital |
-| Transit shelter | 1,200 – 3,500 | |
-| Mall panel | 1,000 – 3,000 | |
+| Bulletin | 1,200 – 10,000 | Low end suburban / secondary market, high end urban static |
+| Digital screen | 10,000 – 21,000 | Premium, large-format digital |
+| Transit shelter | 1,000 – 2,900 | |
+| Mall panel | 850 – 2,500 | |
 
-Traffic ranges per format are calibrated so the **blended CPM lands in the CAD 8–15
-band** that Canadian market data (COMMB) implies for a mixed book — Toronto street-level
-and transit around CAD 5–9, Vancouver urban bulletins CAD 10–22. The current dataset
-blends to **CAD 14.32**.
+Rate and traffic ranges together are calibrated so the **blended CPM lands in the CAD
+8–15 band** that Canadian market data (COMMB) implies for a mixed book — Toronto
+street-level and transit around CAD 5–9, Vancouver urban bulletins CAD 10–22. The
+current dataset blends to **CAD 13.03**, on a 28-day rate period (below).
 
 ### Markets are tiered
 
@@ -61,25 +64,74 @@ markets while impression volume falls with market size:
 Scaling traffic alone would have been wrong: it cuts impressions without cutting price,
 which pushes CPM out of the band by construction.
 
-## Spend is prorated to the flight, not billed as one period
+## Everything is measured to an as-of date
 
-`negotiated_rate` is a **four-week** figure, but a placement runs the whole 4–12 week
-flight and `contracted_impressions` is counted over that whole flight. `export_json.py`
-therefore prorates spend to the flight length:
+The dataset has an as-of date — **2026-09-10**, the last day delivery was reported — and
+every figure on the dashboard is measured to it. Three of the eight campaigns are still
+in the air on that date, and nothing is invented for days that have not happened yet:
+a live placement has delivery rows up to the as-of date and no further.
 
-    spend = negotiated_rate * (flight_days / 30)
+`generate_data.py` fixes the as-of date rather than calling `date.today()`, so the
+database stays reproducible. `metrics.as_of_date()` reads it back out of the data as the
+maximum delivery date, so the two can never drift apart; `export_json.py` also asserts
+that the elapsed days it computes match the delivery rows the database actually holds,
+and refuses to write a payload if they disagree.
 
-Without this, spend and impressions would be on different time bases and CPM would be
-understated by up to 3x on the longer bookings. (`rate_efficiency()` still compares the
-two four-week figures directly — list vs negotiated — so it is unaffected.)
+## Contracted impressions are prorated to the days elapsed
+
+`contracted_impressions` covers the **whole flight**. Comparing a live placement against
+that figure is meaningless: three weeks into a twelve-week flight a perfectly healthy
+site reads as −75%. So variance is measured against the contracted figure prorated to
+the days that have actually run:
+
+    contracted_to_date = contracted_impressions x elapsed_days / flight_days
+
+capped at the full amount, so a completed flight is still measured against the whole
+contract exactly as before. On this dataset the difference is not cosmetic: measured
+against the full flight, **242 of 595 placements would flag, 181 of them healthy sites**
+on live campaigns. Prorated, **61 (10.3%)** flag, and every one of the 61 also appears in
+the 242 — proration removes false positives without hiding a single real problem.
+
+**ASSUMPTION: contracted delivery is flat across the flight.** Contracted impressions are
+generated as `daily_traffic x visibility x days`, so straight-line proration is that same
+model read backwards and is exactly right here. A real booking with weekday/weekend
+weighting, seasonal traffic, or a front-loaded launch burst would need a delivery curve
+rather than a straight line, and the early days of a flight would be the least reliable
+part of the read.
+
+A placement that has not started yet has nothing contracted to date. Its variance is left
+**missing** rather than zero, so it can never trip the flag line.
+
+## Spend is billed to date on a 28-day rate period
+
+`negotiated_rate` is a **four-week** figure. Four weeks is **28 days**, not 30 — the
+earlier code divided by 30 and understated spend by about 7%. `metrics.spend_to_date()`
+prorates the rate to the days that have actually run:
+
+    spend = negotiated_rate x elapsed_days / 28
+
+Spend and impressions then cover the same window. Without proration, CPM would be
+understated by up to 3x on long completed bookings and overstated on anything still in
+the air. The standalone SQL in `src/queries.sql` uses `COUNT(*)` — the number of delivery
+rows, i.e. the same elapsed days — so it produces spend identical to the Python, to the
+dollar.
+
+(`rate_efficiency()` still compares the two four-week figures directly — list vs
+negotiated — so it is unaffected by any of this.)
 
 ## Spend at risk is priced at contracted CPM
 
 For each flagged placement, the impression shortfall is valued at the placement's
-**contracted** CPM — `spend / contracted_impressions` — which is the rate the client
-agreed to pay per thousand. Pricing it at the *delivered* CPM would be circular: that
-number is inflated precisely because delivery fell short. Contracted CPM is
-algebraically identical to `spend x shortfall%`, so the figure holds up either way.
+**contracted** CPM — `spend / contracted_to_date` — which is the rate the client agreed
+to pay per thousand. Both halves are to-date figures, so a live placement is priced on
+the money billed so far. Pricing it at the *delivered* CPM would be circular: that number
+is inflated precisely because delivery fell short. Contracted CPM is algebraically
+identical to `spend x shortfall%`, so the figure holds up either way.
+
+**This is exposure, not a refund.** It is the billed value of impressions not yet
+delivered. Some of it will be made good in inventory rather than cash, some of it will be
+recovered by the site catching up before the flight closes, and on a live campaign that
+is the point — it is flagged early enough to be fixed rather than credited.
 
 ## Impressions are estimated, never counted
 
@@ -132,19 +184,20 @@ to Montreal during the flight is counted once in each market, so a national reac
 is an **upper bound**. Deduplicating it would need panel or mobile-location data that
 tracks the same person across CMAs.
 
-### Known limitation: the heaviest campaigns still saturate the largest markets
+### Known limitation: the heaviest campaign still saturates its largest market
 
-Tiering traffic and rate by market fixed the small-market problem — Calgary previously
-modelled at 99.6% reach and now peaks at 83.9%. What remains is at the other end:
+Tiering traffic and rate by market fixed the small-market problem, and measuring live
+campaigns to date rather than over their full booked flight removed most of what was
+left. What remains is one cell:
 
-**6 of 48 campaign-market pairs still model above 90% reach, the worst at 94.1%**, all
-of them in Tier 1 markets on the three heaviest campaigns. The cause is volume, not the
-tiering: the book delivers ~30 impressions per person in Tier 1, and at `p = 0.35` the
-saturation curve is near its ceiling by that point.
+**1 of 48 campaign-market pairs models above 90% reach, at 94.0%** — Toronto on the
+heaviest campaign. The cause is volume, not the tiering: the book delivers ~26
+impressions per person in Tier 1, and at `p = 0.35` the saturation curve is near its
+ceiling by that point.
 
-In those cells **average frequency is the informative number, not reach** — the model is
-saying "this campaign hit most reachable people in Toronto, roughly 5 to 6 times each,"
-and the reach figure has run out of headroom to say more.
+In that cell **average frequency is the informative number, not reach** — the model is
+saying "this campaign hit most reachable people in Toronto, about 7 times each," and the
+reach figure has run out of headroom to say more.
 
 Closing the gap properly needs one of: more markets (10–12 CMAs rather than 6, so the
 same spend spreads over ~24m people instead of 18m), a smaller book, or a lower `p`.
@@ -153,11 +206,26 @@ patched in by tuning a constant to hit a target.
 
 ## Under-delivery is injected deliberately
 
-Roughly 10% of placements are generated as under-performers, with a delivery multiplier
-between 0.55 and 0.82 applied across the flight. This reflects real causes: sites going
-dark, posters being damaged, construction blocking sightlines, and digital screens
-suffering downtime. On the current dataset that surfaces as ~12% of placements flagged
-below the -5% line, once a few healthy digital sites with downtime are included.
+**Exactly 10%** of placements are generated as under-performers, with a delivery
+multiplier between 0.55 and 0.82 applied across the flight. This reflects real causes:
+sites going dark, posters being damaged, construction blocking sightlines, and digital
+screens suffering downtime.
+
+The 10% is drawn as a fixed sample rather than a per-placement coin flip. A 10% flip over
+~600 placements lands anywhere between 6% and 14% depending on the seed — on the previous
+seed it came out at 6.1% — and the rate written down here should be the rate the data
+actually has. On the current dataset 60 placements are injected and **61 (10.3%) flag**
+below the −5% line. Every injected one is caught, and there is exactly one false
+positive, which is worth being precise about:
+
+> Placement 475 is a healthy transit shelter, 22 days into a 42-day flight, reading
+> −5.7%. Its health multiplier sits in the healthy band; it flags because daily delivery
+> noise of ±5% has not averaged out over 22 days. **This is the cost of reading a flight
+> early**: the prorated variance is noisier the fewer days have run, and the −5% line is
+> a hard cliff that does not widen to account for it. A production version would widen
+> the threshold when few days have elapsed — a confidence interval on the daily noise
+> rather than a fixed line. Here it stays fixed because a fixed line is explainable and
+> the false-positive rate it produces is 1 in 595.
 
 Digital sites additionally get random downtime hours — about 3% of days for healthy
 placements, 12% for under-performers — which reduce that day's delivery pro rata.
@@ -171,10 +239,51 @@ The advertiser's real cost per thousand is based on what was actually delivered,
 what was promised. Using contracted impressions would flatter every placement and hide
 exactly the problem this tool is built to surface.
 
+### Digital and static CPMs are not directly comparable
+
+The format CPM chart should be read **within** a format, not across it.
+
+A digital face rotates in a shared loop. An advertiser buying one is buying a share of
+loop time — typically one slot in a rotation of six or eight — so its impressions are a
+share of the audience passing the site, not all of it. A static bulletin holds the face
+exclusively for the whole flight: every person who passes it sees that ad and nothing
+else in that space.
+
+This model does not distinguish the two. Both formats get `traffic x visibility_factor`,
+with digital given the highest visibility factor (0.48) for dwell time and size. So the
+digital impression count is closer to an exclusive-presence figure than a share-of-loop
+one, which flatters digital's impressions and therefore *understates* its CPM — and even
+so digital comes out as the most expensive format per thousand here. Modelled properly,
+with a share-of-loop divisor, the gap between digital and static CPM would be **wider
+still**, and any conclusion of the form "static is more efficient than digital" drawn
+from this chart overstates its case.
+
+Fixing it properly needs a `loop_slots` field on digital sites and an impression model
+that divides by it. That is a data-model change, not a metric tweak, which is why it is
+documented here rather than patched.
+
 ## Rates sit below rate card
 
 Negotiated rates are generated at 62–95% of published rate card, reflecting that
-agencies rarely pay list price. `rate_efficiency()` reports the resulting discount.
+agencies rarely pay list price. `rate_efficiency()` reports the resulting discount, which
+runs from 5.0% to 37.9% across placements and lands at **20.0% spend-weighted** — the
+figure on the "off rate card" card. Spend-weighted, not a plain average, so it reads as
+the discount achieved on the money actually spent rather than counting a CAD 900 mall
+panel equally with a CAD 20,000 digital screen.
+
+## GRP is a daily showing level, not a flight total
+
+In out-of-home a GRP is always a **daily** rate. A "#50 showing" is inventory delivering
+daily impressions equal to 50% of the market population:
+
+    daily GRP = (impressions / days elapsed) / population x 100
+
+Quoting the flight total instead just restates total impressions in a different unit, and
+makes a twelve-week buy look three times heavier than a four-week one bought at the same
+weight — the opposite of what the number is for. Across markets it is summed as
+impressions over combined population, which is the population-weighted average of the
+per-market showing levels; averaging the percentages directly would over-weight small
+markets. The eight campaigns here run between #5 and #7.
 
 ## What this tool does not do
 
@@ -182,3 +291,9 @@ agencies rarely pay list price. `rate_efficiency()` reports the resulting discou
 - No audience segmentation beyond city and format.
 - No competitive spend estimation.
 - No cross-market reach deduplication, so national reach is an upper bound (above).
+- No share-of-loop model for digital faces, so digital and static CPM are not directly
+  comparable (above).
+- No demographic targeting. Reach is against total CMA population, not against a target
+  audience, so a campaign aimed at 18–34s would report a much smaller true reach.
+- No distinction between make-goods and cash credits. "Spend at risk" is exposure, not a
+  refund forecast.

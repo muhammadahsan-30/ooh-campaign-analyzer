@@ -82,6 +82,13 @@ a{color:inherit}
 .lede p{margin:0 0 8px; color:var(--muted); font-size:13.5px}
 .lede em{color:var(--text); font-style:normal; font-weight:500}
 
+/* ---------- as-of line ---------- */
+.asof{
+  font-size:12.5px; color:var(--muted); line-height:1.6;
+  margin:0 0 14px; max-width:88ch;
+}
+.asof b{color:var(--text); font-weight:600}
+
 /* ---------- KPI strip ---------- */
 .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(178px,1fr)); gap:11px; margin-bottom:24px}
 .kpi{
@@ -155,6 +162,10 @@ tbody tr:hover{background:var(--surface-2)}
   display:inline-block; font-family:var(--mono); font-size:10px; letter-spacing:.04em;
   padding:2px 7px; border-radius:4px; background:var(--surface-2); color:var(--muted);
   border:1px solid var(--line);
+}
+.pill.live{
+  background:transparent; color:var(--amber); border-color:var(--amber);
+  font-weight:600; letter-spacing:.06em;
 }
 .empty{padding:34px 14px; text-align:center; color:var(--faint); font-size:13px}
 

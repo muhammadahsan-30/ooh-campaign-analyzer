@@ -21,6 +21,13 @@ import metrics as m           # single source of truth for CMA populations
 SEED = 42                      # fixed so the dataset is reproducible
 random.seed(SEED)
 
+# The "today" the dataset is generated as of. Fixed rather than date.today() so
+# the database stays reproducible. Campaigns that are still in the air on this
+# date only have delivery reported up to it, which is what a live book looks
+# like and what the prorated variance in metrics.delivery_vs_contract measures
+# against.
+AS_OF = date(2026, 9, 10)
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # OOH_DB lets you point the database somewhere else (useful on network drives,
 # where SQLite cannot take the file locks it needs).
@@ -48,15 +55,16 @@ AREAS = {
 
 # format -> (is_digital, size range ft, traffic range/day, rate range CAD per 4 weeks)
 # Rate ranges are built from published Canadian market benchmarks, not converted
-# from anything. Traffic ranges are calibrated so the blended CPM lands in the
-# CAD 8-15 band that COMMB market data implies. See docs/assumptions.md.
+# from anything. Rate and traffic ranges together are calibrated so the blended
+# CPM lands in the CAD 8-15 band that COMMB market data implies, on a 28-day
+# rate period. See docs/assumptions.md.
 FORMATS = {
     # Static roadside: low end = suburban / secondary market, high end = urban.
-    "bulletin":        (0, (14, 48), (20_000, 75_000),  (1_500, 12_000)),
+    "bulletin":        (0, (14, 48), (20_000, 75_000),  (1_200, 10_000)),
     # Large-format digital, premium placements.
-    "digital_screen":  (1, (10, 30), (35_000, 120_000), (12_000, 25_000)),
-    "transit_shelter": (0, (4, 6),   (8_000,  33_000),  (1_200, 3_500)),
-    "mall_panel":      (0, (3, 6),   (5_000,  23_000),  (1_000, 3_000)),
+    "digital_screen":  (1, (10, 30), (35_000, 120_000), (10_000, 21_000)),
+    "transit_shelter": (0, (4, 6),   (8_000,  33_000),  (1_000, 2_900)),
+    "mall_panel":      (0, (3, 6),   (5_000,  23_000),  (850, 2_500)),
 }
 FORMAT_MIX = ["bulletin"]*12 + ["digital_screen"]*6 + ["transit_shelter"]*7 \
            + ["mall_panel"]*5
@@ -77,6 +85,9 @@ VISIBILITY = {
     "bulletin": 0.42, "digital_screen": 0.48, "transit_shelter": 0.30,
     "mall_panel": 0.34,
 }
+
+# Share of placements deliberately generated as under-performers.
+UNDER_DELIVERY_RATE = 0.10
 
 
 def allocate_cities(n):
@@ -116,12 +127,28 @@ def make_sites(n=120):
     return rows
 
 
+# Five campaigns have finished. Three are still in the air on AS_OF, caught at
+# roughly a quarter, a half and three quarters of the way through their flight.
+# Those three are the ones that exercise the prorated variance path: measured
+# against the full contracted figure they would all read as heavily
+# under-delivering purely because they are not finished yet.
+IN_FLIGHT_PROGRESS = [0.25, 0.50, 0.75]
+
+
 def make_campaigns():
-    rows, start = [], date(2025, 1, 6)
+    rows, first_start = [], date(2025, 1, 6)
     for cid in range(1, 9):
         client, industry = CLIENTS[(cid - 1) % len(CLIENTS)]
-        s = start + timedelta(days=random.randint(0, 420))
         weeks = random.choice([4, 6, 8, 12])
+        live = cid > 8 - len(IN_FLIGHT_PROGRESS)
+        if live:
+            # Back-date the start so the flight is part way through on AS_OF.
+            progress = IN_FLIGHT_PROGRESS[cid - (9 - len(IN_FLIGHT_PROGRESS))]
+            s = AS_OF - timedelta(days=int(weeks * 7 * progress))
+        else:
+            # Completed flights: anywhere in the 14 months before AS_OF, long
+            # enough ago that the flight has closed.
+            s = first_start + timedelta(days=random.randint(0, 420))
         rows.append((
             cid, client, industry,
             random.choice(["awareness", "product_launch", "retail_drive"]),
@@ -158,19 +185,33 @@ def make_delivery(placements, site_lookup):
     Most placements land within a few percent of plan. Roughly 10% materially
     under-deliver — sites go dark, posters get damaged, digital screens have
     downtime. Finding those is the point of the whole tool.
+
+    A flight that is still in the air on AS_OF only has delivery reported up to
+    AS_OF. Nothing is invented for days that have not happened yet, so verified
+    impressions and contracted-to-date impressions cover the same window.
     """
+    # Exactly 10% of placements under-deliver, drawn up front rather than by a
+    # per-placement coin flip. A 10% flip over ~500 placements lands anywhere
+    # from 6% to 14% depending on the seed, and the rate written down in
+    # docs/assumptions.md should be the rate the data actually has.
+    n_under = int(round(len(placements) * UNDER_DELIVERY_RATE))
+    under_ids = set(random.sample([p[0] for p in placements], n_under))
+
     rows, did = [], 1
     for p in placements:
         pid, _, site_id, s, e, _, contracted = p
         fmt, is_digital = site_lookup[site_id]
-        days = (date.fromisoformat(e) - date.fromisoformat(s)).days
-        daily_target = contracted / max(days, 1)
+        d0 = date.fromisoformat(s)
+        flight_days = (date.fromisoformat(e) - d0).days
+        # Days actually reported: the whole flight, or up to and including
+        # AS_OF if the flight has not closed yet.
+        days = min(flight_days, (AS_OF - d0).days + 1)
+        daily_target = contracted / max(flight_days, 1)
 
-        underperformer = random.random() < 0.10
+        underperformer = pid in under_ids
         # Health multiplier applied across the whole flight.
         health = random.uniform(0.55, 0.82) if underperformer else random.uniform(0.96, 1.05)
 
-        d0 = date.fromisoformat(s)
         for k in range(days):
             day = d0 + timedelta(days=k)
             downtime = 0.0
@@ -205,6 +246,8 @@ def main():
     con.executemany("INSERT INTO delivery VALUES (?,?,?,?,?,?)", delivery)
     con.commit()
 
+    live = sum(1 for c in campaigns if date.fromisoformat(c[5]) > AS_OF)
+    print(f"as of      {AS_OF.isoformat():>7}  ({live} campaigns still in flight)")
     print(f"sites      {len(sites):>7,}")
     print(f"campaigns  {len(campaigns):>7,}")
     print(f"placements {len(placements):>7,}")

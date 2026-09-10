@@ -4,6 +4,12 @@ Out-of-home advertising campaign analytics. It finds under-delivering advertisin
 inventory **continuously**, not at end of campaign the way agencies normally catch
 it by hand during reconciliation.
 
+That claim rests on one mechanism: every placement is measured against its
+contracted impressions **prorated to the days elapsed** at an as-of date, not
+against the full booked flight. Do not remove or bypass that — without it the
+tool only works on campaigns that are already over, and the word "continuously"
+becomes false.
+
 ## Context
 
 This is a **portfolio project**. The owner is a first-year Honours Mathematics and
@@ -20,6 +26,13 @@ interview** — not to look impressive at the cost of being explainable.
 - **Assumptions stay documented.** Every modelling assumption lives in
   `docs/assumptions.md`. If you add a metric that rests on an assumption, document
   it in the same change.
+- **One source of truth per number.** The flag threshold, the rate period (28 days)
+  and the proration all live in `src/metrics.py` and are unit-tested there.
+  `export_json.py` calls them; it must never re-implement one inline.
+- **The as-of date comes from the data.** `generate_data.AS_OF` fixes it;
+  `metrics.as_of_date()` reads it back as the maximum delivery date. `export_json.py`
+  refuses to write a payload if its elapsed-day arithmetic disagrees with the
+  delivery rows the database holds.
 - **Boring over clever.** Prefer the readable implementation. This code gets
   explained out loud under questioning.
 - **Small steps.** Do not write more than ~150 lines in one go without stopping to
@@ -33,7 +46,8 @@ interview** — not to look impressive at the cost of being explainable.
 ```
 src/generate_data.py   synthetic data -> SQLite (data/ooh.db), fixed seed
 src/schema.sql         4 normalized tables, enforced foreign keys
-src/metrics.py         delivery variance, CPM, rate efficiency, GRP, reach/frequency
+src/metrics.py         prorated delivery variance, spend to date, CPM, rate efficiency,
+                       daily showing level, reach/frequency
                        each function takes a DataFrame, returns a DataFrame, does one thing
 src/export_json.py     loads the DB, runs metrics.py, writes public/data.json AND public/data.js
 src/queries.sql        standalone analytical SQL (CTEs, ROW_NUMBER/LAG window functions)
@@ -67,7 +81,7 @@ Python 3.10+. From this directory:
 pip install -r requirements.txt      # pandas, pytest
 python src/generate_data.py          # builds data/ooh.db
 python src/export_json.py            # writes public/data.json and public/data.js
-python -m pytest tests/ -q           # 10 tests
+python -m pytest tests/ -q           # 19 tests
 cd public && python -m http.server 8000   # view locally
 ```
 

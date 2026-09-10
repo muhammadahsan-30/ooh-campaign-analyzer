@@ -15,23 +15,25 @@ OUT  = os.path.join(ROOT, "public", "data.json")
 
 
 def load(con):
-    """One row per placement, with campaign and site attributes joined on."""
+    """
+    One row per placement, with campaign and site attributes joined on.
+
+    Spend is NOT computed here. The rate is a four-week figure and a placement
+    may still be in the air, so turning it into money needs the elapsed-days
+    logic that lives in metrics.spend_to_date() and is unit-tested there.
+    """
     return pd.read_sql_query("""
         SELECT p.placement_id, p.campaign_id, p.site_id,
-               p.negotiated_rate,
-               -- negotiated_rate is a 4-week (period) rate, but a placement runs
-               -- the whole 4-12 week flight and contracted_impressions is counted
-               -- over that whole flight. Prorate the rate to the flight length so
-               -- spend and impressions share a time base and CPM is not
-               -- understated by up to 3x on the longer bookings.
-               p.negotiated_rate * (julianday(p.end_date) - julianday(p.start_date)) / 30.0
-                   AS spend,
-               p.contracted_impressions,
-               c.client_name, c.industry, c.objective, c.start_date, c.end_date,
+               p.negotiated_rate, p.contracted_impressions,
+               p.start_date, p.end_date,
+               c.client_name, c.industry, c.objective,
+               c.start_date AS campaign_start, c.end_date AS campaign_end,
                s.city, s.area, s.format, s.rate_card_monthly,
                SUM(d.verified_impressions)  AS verified_impressions,
                SUM(d.estimated_impressions) AS estimated_impressions,
-               SUM(d.downtime_hours)        AS downtime_hours
+               SUM(d.downtime_hours)        AS downtime_hours,
+               COUNT(d.date)                AS delivery_days,
+               MAX(d.date)                  AS last_delivery_date
         FROM placements p
         JOIN campaigns c ON c.campaign_id = p.campaign_id
         JOIN sites     s ON s.site_id     = p.site_id
@@ -44,16 +46,37 @@ def main():
     con = sqlite3.connect(DB)
     df = load(con)
 
-    var  = m.delivery_vs_contract(df)
+    # The as-of date: the last day anything was reported. Everything below is
+    # measured to this date, not to the end of the contracted flight.
+    as_of = m.as_of_date(df)
+
+    var   = m.delivery_vs_contract(df, as_of)
+    money = m.spend_to_date(df, as_of)
+    df = df.merge(var[["placement_id", "flight_days", "elapsed_days", "in_flight",
+                       "contracted_to_date", "variance_abs", "variance_pct"]],
+                  on="placement_id")
+    df = df.merge(money[["placement_id", "spend"]], on="placement_id")
+
+    # The elapsed-day arithmetic and the delivery table have to agree, or every
+    # "to date" figure on the page is measured over the wrong window.
+    mismatch = df[df["elapsed_days"] != df["delivery_days"]]
+    if len(mismatch):
+        raise SystemExit(f"elapsed_days disagrees with delivery rows on "
+                         f"{len(mismatch)} placements: {list(mismatch['placement_id'][:5])}")
+
     cost = m.cpm(df)
     rate = m.rate_efficiency(df)
-    df = df.merge(var[["placement_id", "variance_abs", "variance_pct"]], on="placement_id")
     df = df.merge(cost[["placement_id", "cpm"]], on="placement_id")
     df = df.merge(rate[["placement_id", "discount_pct"]], on="placement_id")
 
-    under = df[df["variance_pct"] < -5]
+    # Which placements are flagged is decided by the tested function, not by a
+    # threshold repeated here. One source of truth for the headline number.
+    ranked = m.delivery_variance_ranked(df, as_of=as_of)
+    under  = df[df["placement_id"].isin(ranked["placement_id"])]
 
     summary = {
+        "as_of":       as_of.date().isoformat(),
+        "in_flight_campaigns": int(df[df["in_flight"]]["campaign_id"].nunique()),
         "sites":       int(pd.read_sql_query("SELECT COUNT(*) n FROM sites", con)["n"][0]),
         "campaigns":   int(df["campaign_id"].nunique()),
         "clients":     int(df["client_name"].nunique()),
@@ -61,19 +84,23 @@ def main():
         "delivery_rows": int(pd.read_sql_query("SELECT COUNT(*) n FROM delivery", con)["n"][0]),
         "spend":       float(df["spend"].sum()),
         "delivered":   float(df["verified_impressions"].sum()),
-        "contracted":  float(df["contracted_impressions"].sum()),
+        "contracted":  float(df["contracted_to_date"].sum()),
+        "contracted_full_flight": float(df["contracted_impressions"].sum()),
         "blended_cpm": float(df["spend"].sum() / df["verified_impressions"].sum() * 1000),
+        # Spend-weighted, so it reads as "the discount actually achieved on the
+        # money spent", not the average of small and large bookings alike.
+        "avg_discount_pct": float((df["discount_pct"] * df["spend"]).sum() / df["spend"].sum()),
         "under_count": int(len(under)),
         "under_pct":   float(len(under) / len(df) * 100),
         # Impression shortfall on each flagged placement, priced at that
-        # placement's CONTRACTED CPM (spend / contracted impressions) -- the rate
-        # the client agreed to pay per thousand -- then summed. Delivered CPM
-        # would be circular: it is inflated precisely because delivery fell
-        # short. Contracted CPM is algebraically identical to spend x shortfall%,
-        # so the figure holds up under either framing.
-        "value_at_risk": float(((under["contracted_impressions"] - under["verified_impressions"])
-                                * (under["spend"] / under["contracted_impressions"] * 1000) / 1000).sum()),
-        "shortfall_impressions": float((under["contracted_impressions"]
+        # placement's CONTRACTED CPM (spend / contracted-to-date impressions) --
+        # the rate the client agreed to pay per thousand -- then summed.
+        # Delivered CPM would be circular: it is inflated precisely because
+        # delivery fell short. Contracted CPM is algebraically identical to
+        # spend x shortfall%, so the figure holds up under either framing.
+        "value_at_risk": float(((under["contracted_to_date"] - under["verified_impressions"])
+                                * (under["spend"] / under["contracted_to_date"] * 1000) / 1000).sum()),
+        "shortfall_impressions": float((under["contracted_to_date"]
                                         - under["verified_impressions"]).sum()),
     }
 
@@ -99,40 +126,52 @@ def main():
             market_population += pop
             markets.append(city)
         delivered = float(g["verified_impressions"].sum())
+        # Every placement on a campaign shares the campaign's flight window, so
+        # the campaign's elapsed and total days are just any row's.
+        elapsed = int(g["elapsed_days"].max())
+        flight  = int(g["flight_days"].max())
+        contracted_to_date = float(g["contracted_to_date"].sum())
         camps.append({
             "campaign_id": int(cid),
             "client": g["client_name"].iloc[0],
             "industry": g["industry"].iloc[0],
             "objective": g["objective"].iloc[0],
-            "start": g["start_date"].iloc[0], "end": g["end_date"].iloc[0],
+            "start": g["campaign_start"].iloc[0], "end": g["campaign_end"].iloc[0],
             "placements": int(len(g)),
+            "elapsed_days": elapsed,
+            "flight_days": flight,
+            "in_flight": bool(g["in_flight"].any()),
             "spend": float(g["spend"].sum()),
-            "contracted": float(g["contracted_impressions"].sum()),
-            "delivered": float(g["verified_impressions"].sum()),
-            "variance_pct": float((g["verified_impressions"].sum() - g["contracted_impressions"].sum())
-                                  / g["contracted_impressions"].sum() * 100),
-            "cpm": float(g["spend"].sum() / g["verified_impressions"].sum() * 1000),
+            "contracted": contracted_to_date,
+            "contracted_full_flight": float(g["contracted_impressions"].sum()),
+            "delivered": delivered,
+            "variance_pct": float((delivered - contracted_to_date) / contracted_to_date * 100),
+            "cpm": float(g["spend"].sum() / delivered * 1000),
             "markets": len(markets),
             "market_list": sorted(markets),
             "reach_pct": round(reached_people / market_population * 100, 1) if market_population else 0.0,
             "frequency": round(delivered / reached_people, 1) if reached_people else 0.0,
+            # Daily showing level across the markets the campaign ran in.
+            "daily_grp": round(m.daily_grp(delivered, market_population, elapsed), 1),
         })
 
     def group(col):
         g = df.groupby(col).agg(placements=("placement_id", "count"),
                                 spend=("spend", "sum"),
                                 delivered=("verified_impressions", "sum"),
-                                contracted=("contracted_impressions", "sum")).reset_index()
+                                contracted=("contracted_to_date", "sum"),
+                                discount_pct=("discount_pct", "mean")).reset_index()
         g["cpm"] = g["spend"] / g["delivered"] * 1000
         g["variance_pct"] = (g["delivered"] - g["contracted"]) / g["contracted"] * 100
         return g.rename(columns={col: "key"}).to_dict("records")
 
-    # Only placements that actually breach the -5% flag line. Previously this took
-    # the 25 worst rows regardless of threshold, which put placements that met
-    # contract into a table titled "under-delivering".
+    # Only placements that actually breach the -5% flag line, in the order the
+    # tested ranking function put them in.
     worst = (under.sort_values("variance_pct")
                   [["placement_id", "client_name", "city", "format",
-                    "contracted_impressions", "verified_impressions",
+                    "contracted_impressions", "contracted_to_date",
+                    "verified_impressions", "in_flight",
+                    "elapsed_days", "flight_days",
                     "variance_pct", "spend", "cpm", "downtime_hours"]]
                   .to_dict("records"))
 
@@ -158,7 +197,9 @@ def main():
             "reach_limitation": "Known limitation: on the three heaviest campaigns the modelled reach still saturates in the largest markets (6 of 48 campaign-market pairs exceed 90%, worst 94.1%). In those cells average frequency, not reach, is the informative number. Closing it properly needs more markets rather than a tuned constant.",
             "market_tiers": "Traffic and rate card both scale by market tier - Tier 1 (Toronto, Montreal, Vancouver) 1.0x traffic and upper-half rates; Tier 2 (Calgary, Ottawa, Edmonton) 0.6x traffic and lower-half rates - so CPM stays comparable across markets while volume falls with market size.",
             "under_delivery": "~10% of placements are generated as under-performers, reflecting dark sites, damage and digital downtime.",
-            "spend_basis": "Spend prorates each placement's 4-week negotiated rate to its full flight length (rate * days / 30), so spend and impressions share a time base.",
+            "as_of_basis": f"Everything is measured to {as_of.date().isoformat()}, the last day delivery was reported. A campaign still in the air is compared against its contracted impressions PRORATED to the days elapsed (contracted * elapsed / flight days), not against the full-flight figure — otherwise a healthy placement three weeks into a twelve-week flight would read as -75%. Proration assumes contracted delivery is flat across the flight.",
+            "spend_basis": "Spend prorates each placement's 4-week (28-day) negotiated rate to the days that have actually run (rate * elapsed days / 28), so spend and impressions cover the same window.",
+            "digital_vs_static_cpm": "A digital face rotates in a shared loop: its impressions are a share of loop time, not the exclusive presence a static bulletin holds for the whole flight. Comparing the two CPMs directly therefore overstates static's efficiency, and the format CPM chart should be read within a format, not across.",
         },
     }
 
@@ -176,10 +217,12 @@ def main():
     con.close()
 
     s = summary
+    print(f"as of        {s['as_of']:>10}  ({s['in_flight_campaigns']} campaigns in flight)")
     print(f"placements   {s['placements']:>10,}")
-    print(f"spend        {s['spend']:>10,.0f} CAD")
-    print(f"delivered    {s['delivered']:>10,.0f} impressions")
-    print(f"blended CPM  {s['blended_cpm']:>10,.1f} CAD")
+    print(f"spend        {s['spend']:>10,.0f} CAD (to date)")
+    print(f"delivered    {s['delivered']:>10,.0f} of {s['contracted']:,.0f} contracted to date")
+    print(f"blended CPM  {s['blended_cpm']:>10,.2f} CAD")
+    print(f"discount     {s['avg_discount_pct']:>10,.1f} % off rate card")
     print(f"under-deliv. {s['under_count']:>10} placements ({s['under_pct']:.1f}%)")
     print(f"value at risk{s['value_at_risk']:>10,.0f} CAD")
     print(f"\nwrote {OUT} ({os.path.getsize(OUT)/1024:.0f} KB)")

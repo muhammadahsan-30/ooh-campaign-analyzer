@@ -38,18 +38,43 @@
   }
   function money(n) { return Math.round(n).toLocaleString(); }
   function tidy(s) { return String(s).replace(/_/g, " "); }
+  function longdate(iso) {
+    var p = String(iso).split("-");
+    var MON = ["January", "February", "March", "April", "May", "June",
+               "July", "August", "September", "October", "November", "December"];
+    return Number(p[2]) + " " + MON[Number(p[1]) - 1] + " " + p[0];
+  }
+  // "15 / 56 d", with a LIVE pill when the flight has not closed yet.
+  function flight(elapsed, total, live) {
+    return (live ? '<span class="pill live">LIVE</span> ' : "") +
+           '<span class="dim">' + elapsed + " / " + total + " d</span>";
+  }
   function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+  // ---------- as-of line ----------
+  // Every figure on the page is measured to this date, so it is stated once,
+  // above the numbers, rather than left implied.
+  function renderAsOf(s) {
+    document.getElementById("asof").innerHTML =
+      "Everything below is measured <b>as of " + longdate(s.as_of) +
+      "</b>, the last day delivery was reported. " + s.in_flight_campaigns +
+      " of " + s.campaigns + " campaigns are still in flight; those are compared " +
+      "against their contracted impressions prorated to the days elapsed, not the full flight.";
+    document.getElementById("brandsub").innerHTML =
+      "Delivery reconciliation &middot; as of " + s.as_of + " &middot; synthetic dataset";
+  }
 
   // ---------- KPI cards ----------
   function renderCards(s) {
     // The two flagged cards lead: they are the answer the dashboard exists to
-    // give. Spend / delivered / CPM follow as context.
+    // give. Spend / delivered / CPM / discount follow as context.
     var cards = [
-      { lab: "Under-delivering", val: s.under_count, sub: s.under_pct.toFixed(1) + "% of placements below −5%", cls: "flag" },
+      { lab: "Under-delivering", val: s.under_count, sub: s.under_pct.toFixed(1) + "% of placements below −5% to date", cls: "flag" },
       { lab: "Spend at risk", val: "$" + money(s.value_at_risk), sub: "CAD attached to the shortfall", cls: "flag" },
-      { lab: "Media spend tracked", val: "$" + money(s.spend), sub: "CAD across " + s.placements + " placements" },
-      { lab: "Impressions delivered", val: nfmt(s.delivered), sub: "vs " + nfmt(s.contracted) + " contracted", cls: "ok" },
-      { lab: "Blended CPM", val: "$" + s.blended_cpm.toFixed(2), sub: "CAD per thousand, verified delivery" }
+      { lab: "Spend billed to date", val: "$" + money(s.spend), sub: "CAD across " + s.placements + " placements" },
+      { lab: "Impressions delivered", val: nfmt(s.delivered), sub: "vs " + nfmt(s.contracted) + " contracted to date", cls: "ok" },
+      { lab: "Blended CPM", val: "$" + s.blended_cpm.toFixed(2), sub: "CAD per thousand, verified delivery" },
+      { lab: "Off rate card", val: s.avg_discount_pct.toFixed(1) + "%", sub: "negotiated vs published, spend-weighted" }
     ];
     document.getElementById("cards").innerHTML = cards.map(function (c) {
       return '<div class="kpi ' + (c.cls || "") + '">' +
@@ -88,7 +113,7 @@
     document.getElementById("count").textContent =
       rows.length + " of " + D.worst_placements.length + " flagged placements shown";
     if (!rows.length) {
-      tb.innerHTML = '<tr><td colspan="8" class="empty">No under-delivering placements match these filters.</td></tr>';
+      tb.innerHTML = '<tr><td colspan="9" class="empty">No under-delivering placements match these filters.</td></tr>';
       return;
     }
     tb.innerHTML = rows.map(function (r, i) {
@@ -97,7 +122,9 @@
         "<td>" + r.client_name + "</td>" +
         '<td class="dim">' + r.city + "</td>" +
         '<td><span class="pill">' + tidy(r.format) + "</span></td>" +
-        '<td class="num">' + nfmt(r.contracted_impressions) + "</td>" +
+        '<td class="num">' + flight(r.elapsed_days, r.flight_days, r.in_flight) + "</td>" +
+        '<td class="num" title="' + nfmt(r.contracted_impressions) + ' over the full flight">' +
+          nfmt(r.contracted_to_date) + "</td>" +
         '<td class="num">' + nfmt(r.verified_impressions) + "</td>" +
         '<td class="num ' + (r.variance_pct < 0 ? "neg" : "pos") + '">' + pct(r.variance_pct) + "</td>" +
         '<td class="num">' + money(r.spend) + "</td>" +
@@ -114,13 +141,15 @@
     });
     var tb = document.querySelector("#tCamp tbody");
     if (!rows.length) {
-      tb.innerHTML = '<tr><td colspan="10" class="empty">No campaigns match these filters.</td></tr>';
+      tb.innerHTML = '<tr><td colspan="12" class="empty">No campaigns match these filters.</td></tr>';
       return;
     }
     tb.innerHTML = rows.map(function (c) {
       return "<tr>" +
         "<td>" + c.client + "</td>" +
         '<td><span class="pill">' + tidy(c.objective) + "</span></td>" +
+        '<td class="num" title="' + c.start + " to " + c.end + '">' +
+          flight(c.elapsed_days, c.flight_days, c.in_flight) + "</td>" +
         '<td class="num dim" title="' + c.market_list.join(", ") + '">' + c.markets + "</td>" +
         '<td class="num">' + c.placements + "</td>" +
         '<td class="num">' + money(c.spend) + "</td>" +
@@ -129,6 +158,8 @@
         '<td class="num">' + c.cpm.toFixed(2) + "</td>" +
         '<td class="num">' + c.reach_pct.toFixed(0) + "%</td>" +
         '<td class="num">' + c.frequency.toFixed(1) + "</td>" +
+        '<td class="num" title="daily impressions as a % of combined market population">#' +
+          c.daily_grp.toFixed(0) + "</td>" +
         "</tr>";
     }).join("");
   }
@@ -201,7 +232,9 @@
       reach_limitation: "Reach — known limitation",
       market_tiers: "Market tiers",
       under_delivery: "Under-delivery rate",
-      spend_basis: "Spend basis"
+      as_of_basis: "As-of date and proration",
+      spend_basis: "Spend basis",
+      digital_vs_static_cpm: "Digital vs static CPM"
     };
     document.getElementById("assump").innerHTML = Object.keys(D.assumptions).map(function (k) {
       return '<div class="arow"><dt>' + (labels[k] || k) + "</dt><dd>" + D.assumptions[k] + "</dd></div>";
@@ -211,6 +244,7 @@
   // ---------- boot ----------
   function redraw() { renderWorst(); renderCampaigns(); }
 
+  renderAsOf(D.summary);
   renderCards(D.summary);
   fillSelect("fClient", D.by_client.map(function (r) { return r.key; }));
   fillSelect("fCity", D.by_city.map(function (r) { return r.key; }));
