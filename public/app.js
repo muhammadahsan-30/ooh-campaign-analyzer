@@ -66,21 +66,42 @@
 
   // ---------- KPI cards ----------
   function renderCards(s) {
-    // The two flagged cards lead: they are the answer the dashboard exists to
-    // give. Spend / delivered / CPM / discount follow as context.
+    // Four cards, not six. The two amber ones are the answer the dashboard
+    // exists to give, so they are physically larger and lead; spend and
+    // delivery follow as context. Blended CPM and the rate-card discount are
+    // real but secondary, so they drop to the rail below rather than taking a
+    // card each and wrapping the grid onto a second row.
     var cards = [
-      { lab: "Under-delivering", val: s.under_count, sub: s.under_pct.toFixed(1) + "% of placements below −5% to date", cls: "flag" },
-      { lab: "Spend at risk", val: "$" + money(s.value_at_risk), sub: "CAD attached to the shortfall", cls: "flag" },
-      { lab: "Spend billed to date", val: "$" + money(s.spend), sub: "CAD across " + s.placements + " placements" },
-      { lab: "Impressions delivered", val: nfmt(s.delivered), sub: "vs " + nfmt(s.contracted) + " contracted to date", cls: "ok" },
-      { lab: "Blended CPM", val: "$" + s.blended_cpm.toFixed(2), sub: "CAD per thousand, verified delivery" },
-      { lab: "Off rate card", val: s.avg_discount_pct.toFixed(1) + "%", sub: "negotiated vs published, spend-weighted" }
+      { lab: "Under-delivering", val: s.under_count,
+        sub: s.under_pct.toFixed(1) + "% of placements below −5% to date", cls: "flag lead" },
+      { lab: "Spend at risk", val: "$" + money(s.value_at_risk),
+        sub: "CAD attached to the shortfall", cls: "flag lead" },
+      { lab: "Spend billed to date", val: "$" + money(s.spend),
+        sub: "CAD across " + s.placements + " placements" },
+      { lab: "Impressions delivered", val: nfmt(s.delivered),
+        sub: "vs " + nfmt(s.contracted) + " contracted to date", cls: "ok" }
     ];
     document.getElementById("cards").innerHTML = cards.map(function (c) {
       return '<div class="kpi ' + (c.cls || "") + '">' +
              '<div class="lab">' + c.lab + "</div>" +
              '<div class="val">' + c.val + "</div>" +
              '<div class="sub">' + c.sub + "</div></div>";
+    }).join("");
+
+    var rail = [
+      { lab: "Blended CPM", val: "$" + s.blended_cpm.toFixed(2) + " CAD",
+        note: "per thousand, verified delivery" },
+      { lab: "Off rate card", val: s.avg_discount_pct.toFixed(1) + "%",
+        note: "negotiated vs published, spend-weighted" },
+      { lab: "Contracted to date", val: nfmt(s.contracted),
+        note: "of " + nfmt(s.contracted_full_flight) + " over the full flights" },
+      { lab: "Delivery records", val: money(s.delivery_rows),
+        note: "one row per placement per day" }
+    ];
+    document.getElementById("rail").innerHTML = rail.map(function (r) {
+      return '<div class="railitem"><span class="rlab">' + r.lab + "</span>" +
+             '<span class="rval">' + r.val + "</span>" +
+             '<span class="rnote">' + r.note + "</span></div>";
     }).join("");
   }
 
@@ -102,6 +123,13 @@
   }
 
   // ---------- tables ----------
+  // 61 rows of dense monospace is strong evidence and exhausting to read, so
+  // the table opens on the worst 15 and the rest are one click away. The cap
+  // applies after filtering, so filtering to a client you can see whole never
+  // shows a pointless "show all" control.
+  var WORST_SHOWN = 15;
+  var worstExpanded = false;
+
   function renderWorst() {
     var f = filters();
     var rows = D.worst_placements.filter(function (r) {
@@ -110,12 +138,26 @@
           && (!f.format || r.format      === f.format);
     });
     var tb = document.querySelector("#tWorst tbody");
+    var more = document.getElementById("moreWorst");
     document.getElementById("count").textContent =
       rows.length + " of " + D.worst_placements.length + " flagged placements shown";
     if (!rows.length) {
       tb.innerHTML = '<tr><td colspan="9" class="empty">No under-delivering placements match these filters.</td></tr>';
+      more.hidden = true;
       return;
     }
+
+    var total = rows.length;
+    if (total <= WORST_SHOWN) {
+      more.hidden = true;                       // everything already fits
+    } else {
+      more.hidden = false;
+      more.textContent = worstExpanded
+        ? "Show the worst " + WORST_SHOWN + " only"
+        : "Show all " + total + " →";
+      if (!worstExpanded) rows = rows.slice(0, WORST_SHOWN);
+    }
+
     tb.innerHTML = rows.map(function (r, i) {
       return "<tr>" +
         '<td class="rank">' + (i + 1) + "</td>" +
@@ -250,11 +292,21 @@
   fillSelect("fCity", D.by_city.map(function (r) { return r.key; }));
   fillSelect("fFormat", D.by_format.map(function (r) { return r.key; }));
   FIELDS.forEach(function (id) {
-    document.getElementById(id).addEventListener("change", redraw);
+    // A new filter starts collapsed again — otherwise switching from a client
+    // with 4 flagged placements back to All silently dumps 61 rows.
+    document.getElementById(id).addEventListener("change", function () {
+      worstExpanded = false;
+      redraw();
+    });
   });
   document.getElementById("reset").addEventListener("click", function () {
     FIELDS.forEach(function (id) { document.getElementById(id).value = ""; });
+    worstExpanded = false;
     redraw();
+  });
+  document.getElementById("moreWorst").addEventListener("click", function () {
+    worstExpanded = !worstExpanded;
+    renderWorst();
   });
   renderMonthly();
   renderFormat();
