@@ -62,7 +62,7 @@ flight is over.
 | **Gross shortfall** | Impressions missing, counting only placements that are behind |
 | **Net shortfall** | Gross shortfall after over-delivering placements are subtracted |
 | **Masking** | The share of gross shortfall cancelled out by over-delivery elsewhere |
-| **Media-value exposure** | The shortfall priced in dollars at the contracted CPM |
+| **Media-value exposure** | The shortfall priced in dollars at the contracted CPM. Two named measures: *flagged* covers the 82 placements past the −5% line, *total negative* covers all 227 behind by any amount. They are never interchanged |
 | **Live issue** | A flagged placement still in flight — there is still time to act |
 | **Reconciliation** | A flagged placement whose flight has closed — make-good or credit |
 
@@ -136,7 +136,8 @@ by hand.
 | Delivery to plan | 97.9% — 418.7m verified of 427.7m contracted to date |
 | Gross shortfall | 10.5m impressions across 227 placements, **14% masked** |
 | Placements flagged below −5% | 82 (13.8%) — **21 live**, 61 completed |
-| Billed shortfall | CAD 117,058 (CAD 32,280 live · CAD 84,777 to reconcile) |
+| Flagged media-value exposure | CAD 117,058 across the 82 flagged (CAD 32,280 live · CAD 84,777 to reconcile) |
+| Total negative delivery exposure | CAD 134,655 across all 227 placements behind by any amount |
 | Still preventable on live placements | CAD 36,255, of which CAD 28,884 sits in 8 issues |
 | Spend billed to date | CAD 5.41m |
 | Blended CPM | CAD 12.92 on verified delivery |
@@ -154,16 +155,27 @@ has the aligned precision a credit conversation needs.
 ![Attention Centre](docs/screenshots/02-attention.png)
 
 **Campaign drill-down** — pacing, a flight-day delivery trajectory with fault onsets
-marked on the axis, and what is driving the shortfall by market, format and placement.
+marked on the axis, a gross-to-net waterfall, and what is driving the shortfall by market,
+format and placement.
 
 ![Campaign drill-down](docs/screenshots/03-campaign.png)
+
+**Markets** — a campaign × market heatmap answering a question ranked bars cannot: is a
+market behind *everywhere*, or behind on one campaign? Toronto is behind on 8 of 8.
 
 Seven views in all: Overview, Attention Centre, Campaigns, Markets, Inventory,
 Efficiency and Method. Light and dark themes, both designed rather than inverted, with
 the theme choice persisted. The status palette is validated for colour-vision deficiency
 and every status is a glyph plus a word, never colour alone.
 
-![Dark theme](docs/screenshots/04-dark.png)
+![Markets heatmap](docs/screenshots/04-markets.png)
+
+Every figure a general reader might not know carries an **i** affordance — click or
+keyboard — giving a one-sentence plain-English reading and a route into the methodology.
+"Media-value exposure", for instance, explains that it is exposure, *not* automatically a
+refund or a loss.
+
+![Dark theme](docs/screenshots/05-dark.png)
 
 ---
 

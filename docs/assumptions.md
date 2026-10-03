@@ -321,6 +321,27 @@ On the current dataset the whole book reads **−2.1% net** while carrying **10.
 impressions of gross shortfall across 227 placements**, with **14% of it masked**. Per
 campaign the masking runs from 7% to 81%.
 
+## Two exposure measures, two populations, two names
+
+"Behind" and "flagged" are different sets of placements, and a money figure measured over
+one must never carry the other's name:
+
+| Name | Population | Value |
+|---|---|---|
+| **Total negative delivery exposure** | every placement delivering under contract to date | 227 placements, CAD 134,655 |
+| **Flagged media-value exposure** | the subset breaching the -5% attention line | 82 placements, CAD 117,058 |
+
+Gross shortfall, over-delivery offset and net shortfall are all measured over the
+**behind** population, so the impression figures and the total-negative-exposure figure
+are directly comparable. The Attention Centre acts on the **flagged** population, so its
+money figure is the smaller one.
+
+The difference is CAD 17,598 and it is easy to introduce by accident: a draft SQL query
+written while auditing this project summed exposure over all 227 placements and compared
+it against Python's 82, which looks like a reconciliation failure and is actually a
+definitional one. `src/queries.sql` carries the same note at the top of the file, and any
+future Power BI measure inherits these two names unchanged.
+
 ## Preventable exposure is modelled, and is not the same as billed shortfall
 
 Two money figures, which the interface never adds together:

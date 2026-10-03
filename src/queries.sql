@@ -1,5 +1,24 @@
 -- Analytical SQL for the OOH Campaign Performance Analyzer.
 -- Each query answers a question an agency actually asks.
+--
+-- ============================================================================
+-- TWO POPULATIONS, TWO NAMES -- read this before writing a new query.
+--
+-- "Behind" and "flagged" are different sets and must never share a metric name:
+--
+--   behind   = every placement delivering less than contracted to date
+--              (227 placements). Gross shortfall, over-delivery offset and
+--              net shortfall are all measured over this set.
+--              Its money figure is TOTAL NEGATIVE DELIVERY EXPOSURE (CAD 134,655).
+--
+--   flagged  = the subset breaching the -5% attention line (82 placements).
+--              This is what the Attention Centre acts on.
+--              Its money figure is FLAGGED MEDIA-VALUE EXPOSURE (CAD 117,058).
+--
+-- Summing exposure over "behind" and labelling it "flagged" overstates the
+-- actionable figure by CAD 17,598. Python, SQL, the interface and any future
+-- DAX measure use these two names for these two sets, and nothing else.
+-- ============================================================================
 
 -- ============================================================================
 -- 1. Spend and delivery by client, ranked.

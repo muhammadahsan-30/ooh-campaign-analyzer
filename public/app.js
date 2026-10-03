@@ -73,6 +73,92 @@
   function placeName(p) { return p.city + " · " + cap(p.format); }
   function days(n) { return n + (n === 1 ? " day" : " days"); }
 
+
+  /* ---------------- the explain layer ----------------
+   * Three levels, as docs/design-spec.md section 13 specified and the first
+   * build never shipped: the value, a plain-English reading behind an info
+   * affordance, and a route into the methodology. Click or keyboard, never
+   * hover-only -- hover excludes touch and excludes anyone navigating by
+   * keyboard, which is most of the audience this layer exists for.
+   */
+  var GLOSSARY = {
+    delivery_plan: ["Delivery vs plan",
+      "How far ahead or behind a placement is against the audience it should have delivered by today — not against its whole booking. A campaign three weeks into twelve is judged on those three weeks."],
+    contracted: ["Contracted to date",
+      "The audience owed so far: the full booking spread evenly across the flight and counted up to today."],
+    gross: ["Gross shortfall",
+      "All the missing impressions across placements that are behind, before any over-delivery elsewhere is subtracted. This is the operational number — what the advertiser actually did not get."],
+    net: ["Net shortfall",
+      "What is left of the gross shortfall once placements running ahead of plan are counted against it. This is the number campaign-level reporting usually shows."],
+    masking: ["Masking",
+      "The share of the gross shortfall cancelled out on paper by other placements over-delivering. High masking means the campaign number looks healthier than the sites underneath it."],
+    exposure: ["Media-value exposure",
+      "The estimated media value attached to delivery that is behind plan. This is exposure, not automatically a refund or a financial loss — some is made good in inventory, some is recovered before the flight closes."],
+    preventable: ["Still preventable",
+      "The media value that would keep accruing over the rest of the flight if a live issue is not fixed. It is a projection of today's rate, and is never added to the value already lost — they are different quantities."],
+    recovery: ["Recovery pace",
+      "The daily delivery a placement would need for the rest of its flight to finish its full booking, shown against the pace it was originally planned at. A healthy site delivers 96–105% of plan, so anything much above that cannot be met by the site alone."],
+    flight: ["Flight",
+      "The period a placement or campaign is booked to run, from its start date to its end date."],
+    placement: ["Placement",
+      "One booked advertising location within a campaign — a single site, running for one campaign, over one date window."],
+    impressions: ["Impressions",
+      "The estimated number of people who had the opportunity to see the ad. Out-of-home audience is always estimated from traffic counts and a visibility factor, never counted directly."],
+    cpm: ["CPM",
+      "Cost per thousand impressions — what was paid for every thousand opportunities to see."],
+    reach: ["Reach and frequency",
+      "Reach is the estimated share of a market's population who saw the campaign at least once; frequency is how many times, on average, each of them saw it. Both are modelled, not measured."],
+    reconciliation: ["Reconciliation",
+      "The end-of-campaign review where an agency checks what was actually delivered against what was booked, and agrees any credit or replacement advertising."],
+    makegood: ["Make-good",
+      "Replacement advertising given instead of a cash refund when a campaign under-delivers."],
+    detection: ["Detection delay",
+      "The days between a placement starting to fall behind and this tool flagging it — set against how long an end-of-campaign reconciliation would have taken to find the same problem."],
+    live_issue: ["Live issue",
+      "A placement that is behind plan and still running, so there is still flight left in which to do something about it."],
+    completed_short: ["Completed shortfall",
+      "A placement that finished below its booking. Nothing more can be delivered, so it becomes a reconciliation conversation."]
+  };
+
+  function info(key) {
+    var g = GLOSSARY[key];
+    if (!g) return "";
+    return '<button class="xpl" type="button" data-info="' + key +
+           '" aria-expanded="false" aria-label="What does ' + g[0] + ' mean?">i</button>';
+  }
+
+  var pop = document.createElement("div");
+  pop.className = "pop"; pop.hidden = true;
+  pop.setAttribute("role", "dialog");
+  document.body.appendChild(pop);
+  var popTrigger = null;
+
+  function closePop() {
+    if (!popTrigger) return;
+    pop.classList.remove("on");
+    popTrigger.setAttribute("aria-expanded", "false");
+    popTrigger = null;
+    setTimeout(function () { if (!popTrigger) pop.hidden = true; }, 140);
+  }
+
+  function openPop(btn) {
+    var g = GLOSSARY[btn.dataset.info];
+    if (!g) return;
+    if (popTrigger === btn) { closePop(); return; }
+    if (popTrigger) popTrigger.setAttribute("aria-expanded", "false");
+    popTrigger = btn;
+    pop.innerHTML = '<div class="term">' + esc(g[0]) + "</div><p>" + esc(g[1]) + "</p>" +
+                    '<a class="more" href="#method">Full methodology &rarr;</a>';
+    pop.hidden = false;
+    var r = btn.getBoundingClientRect();
+    var w = Math.min(320, window.innerWidth - 32);
+    var left = Math.max(16, Math.min(r.left + window.scrollX, window.innerWidth - w - 16));
+    pop.style.top = (r.bottom + window.scrollY + 8) + "px";
+    pop.style.left = left + "px";
+    btn.setAttribute("aria-expanded", "true");
+    requestAnimationFrame(function () { pop.classList.add("on"); });
+  }
+
   /* ---------------- app shell ---------------- */
   var VIEWS = [["overview", "Overview"], ["attention", "Attention"],
                ["campaigns", "Campaigns"], ["markets", "Markets"],
@@ -125,6 +211,8 @@
   function renderOverview() {
     document.getElementById("asofchip").textContent = "as of " + longdate(S.as_of);
     document.getElementById("heroFig").textContent = S.delivery_to_plan_pct.toFixed(1) + "%";
+    var hl = document.querySelector(".herolab");
+    if (hl && !hl.querySelector(".xpl")) hl.insertAdjacentHTML("beforeend", info("delivery_plan"));
     document.getElementById("heroSub").textContent =
       imp(S.delivered) + " verified of " + imp(S.contracted) +
       " expected by " + longdate(S.as_of);
@@ -144,7 +232,8 @@
     // The tension the product exists to surface, stated directly under the
     // reassuring headline figure.
     document.getElementById("hiddenNote").innerHTML =
-      "…but <b>" + imp(S.gross_shortfall) + " impressions</b> are short across <b>" +
+      "…but <b>" + imp(S.gross_shortfall) + " impressions</b>" + info("gross") +
+      " are short across <b>" +
       S.placements_behind + " placements</b>. <b>" + Math.round(S.masking_pct) +
       "%</b> of that is cancelled out on paper by other sites running ahead, which is why " +
       "the headline reads " + pct(S.variance_pct) + " rather than " +
@@ -183,8 +272,22 @@
       det.median_detection_delay_days + " days after they began — with a median of " +
       det.median_days_remaining_at_detection + " days of flight still left to act in.";
 
+    renderWaterfall();
     renderPacing();
     renderExposure();
+  }
+
+  // The masking concept, seen rather than inferred from three separate figures.
+  function renderWaterfall() {
+    var el = document.getElementById("wfPortfolio");
+    if (!el) return;
+    el.innerHTML = waterfall(S.gross_shortfall, S.over_delivery_offset, S.net_shortfall);
+    document.getElementById("wfNote").innerHTML =
+      "Across the book, <b>" + imp(S.gross_shortfall) + "</b> of audience was missed on <b>" +
+      S.placements_behind + " placements</b>. Other placements ran ahead of plan by <b>" +
+      imp(S.over_delivery_offset) + "</b>, and campaign reporting subtracts that, leaving a net <b>" +
+      imp(S.net_shortfall) + "</b> — so <b>" + Math.round(S.masking_pct) +
+      "%</b> of the real gap never reaches the headline number." + info("masking");
   }
 
   function pacingBars(progress, delivered, statusClass) {
@@ -305,14 +408,12 @@
           (p.recovered ? ' <span class="chip ok"><i class="dot"></i>Recovered</span>' : "") +
         "</div>" +
       "</div><div class='iexp'><div class='v num'>" + exact(p.preventable_exposure) +
-        "</div><div class='l'>still preventable</div>" +
-        "<div class='l'>" + exact(p.billed_shortfall) + " already lost</div></div></div>" +
-      '<div class="igrid">' +
-        '<div><div class="k">Behind plan</div><div class="v neg">' + pct(p.variance_pct) + "</div></div>" +
-        '<div><div class="k">Running at</div><div class="v">' + running + "</div></div>" +
-        '<div><div class="k">Days left</div><div class="v">' + p.remaining_days + "</div></div>" +
-        '<div><div class="k">Recovery pace</div><div class="v">' +
-          (pace === null ? "—" : Math.round(pace * 100) + "%") + "</div></div>" +
+        "</div><div class='l'>still preventable" + info("preventable") + "</div></div></div>" +
+      comparisonStrip(p) +
+      '<div class="ifacts">' +
+        '<div><span class="k">Behind plan</span><span class="v neg">' +
+          pct(p.variance_pct) + "</span></div>" +
+        '<div><span class="k">Delivering now</span><span class="v">' + running + "</span></div>" +
       "</div>" +
       '<div class="inote"><span class="glyph">⚑</span><span>' + note + "</span></div>" +
       detected +
@@ -513,6 +614,151 @@
       "</svg>";
   }
 
+
+  /* ---------------- comparison strip (issue cards) ----------------
+   * Three rows of the same bar component, answering the three questions a
+   * reader has before they read a single figure: how far behind, how much time
+   * is left, and how hard recovery would be. One visual language repeated, not
+   * three different charts stacked.
+   */
+  function lane(label, cls, pctRaw) {
+    var pct = Math.max(0, Math.min(100, pctRaw));
+    return '<span class="laneline"><em>' + label + '</em>' +
+           '<span class="lane"><i class="' + cls + '" style="width:' + pct.toFixed(1) +
+           '%"></i></span></span>';
+  }
+
+  function comparisonStrip(p) {
+    var rows = [];
+
+    // 1. delivery against what was owed by today. Both bars share one scale, so
+    // the gap between them IS the shortfall rather than merely representing it.
+    var actPct = p.contracted_to_date > 0
+      ? p.verified_impressions / p.contracted_to_date * 100 : 0;
+    rows.push('<div class="srow"><span class="sk">Delivery to date' + info("delivery_plan") +
+      '</span><span class="pair">' +
+        lane("expected", "f-ghost", 100) +
+        lane("actual", "f-act", actPct) +
+      '</span><span class="sv">' + imp(p.verified_impressions) +
+        '<span class="cap">of ' + imp(p.contracted_to_date) + " expected</span></span></div>");
+
+    // 2. how much flight is left to act in
+    var flightPct = p.flight_days > 0 ? p.elapsed_days / p.flight_days * 100 : 0;
+    rows.push('<div class="srow"><span class="sk">Flight' + info("flight") +
+      '</span><span class="pair">' +
+        lane("elapsed", "f-time", flightPct) +
+      '</span><span class="sv">' + days(p.remaining_days) +
+        '<span class="cap">still to run</span></span></div>');
+
+    // 3. what recovery would take, against what the site was planned to do
+    if (p.recovery_pace !== null && p.planned_daily) {
+      var mx = Math.max(p.planned_daily, p.required_daily || 0) || 1;
+      rows.push('<div class="srow"><span class="sk">Daily pace' + info("recovery") +
+        '</span><span class="pair">' +
+          lane("planned", "f-ok", p.planned_daily / mx * 100) +
+          lane("needed", "f-need", (p.required_daily || 0) / mx * 100) +
+        '</span><span class="sv">' + Math.round(p.recovery_pace * 100) + "%" +
+          '<span class="cap">of planned pace</span></span></div>');
+    }
+
+    // Two money measures on one scale so they are comparable, in two separate
+    // bars so they can never be read as a stack. Adding them would be wrong:
+    // one is spent, the other has not happened yet.
+    var emx = Math.max(p.billed_shortfall, p.preventable_exposure) || 1;
+    rows.push('<div class="srow money"><span class="sk">Media value' + info("exposure") +
+      '</span><span class="pair">' +
+        lane("already lost", "f-lost", p.billed_shortfall / emx * 100) +
+        lane("preventable", "f-prev", p.preventable_exposure / emx * 100) +
+      '</span><span class="sv">' + exact(p.billed_shortfall) +
+        '<span class="cap">' + exact(p.preventable_exposure) + " preventable</span></span></div>");
+
+    return '<div class="strip">' + rows.join("") + "</div>";
+  }
+
+  /* ---------------- gross -> offset -> net waterfall ----------------
+   * The project's signature finding, which until now existed only as a
+   * sentence. A waterfall is the canonical form for exactly this arithmetic:
+   * a starting quantity, a reduction, and what survives it.
+   */
+  function waterfall(gross, offset, net) {
+    if (!(gross > 0)) return "";
+    var W = 560, H = 210, T = 34, B = 52, L = 8, R = 8;
+    var plot = H - T - B, max = gross * 1.15;
+    var bw = 118, gap = (W - L - R - 3 * bw) / 2;
+    var xs = [L, L + bw + gap, L + 2 * (bw + gap)];
+    function hv(v) { return v / max * plot; }
+    function yv(v) { return T + plot - hv(v); }
+
+    var bars = [
+      ["bar-gross", yv(gross), hv(gross), "Gross shortfall", imp(gross)],
+      ["bar-offset", yv(gross), hv(offset), "Offset by over-delivery", "\u2212" + imp(offset)],
+      ["bar-net", yv(net), hv(net), "Net shortfall", imp(net)]
+    ].map(function (b, i) {
+      return '<rect class="' + b[0] + '" x="' + xs[i] + '" y="' + b[1].toFixed(1) +
+             '" width="' + bw + '" height="' + Math.max(2, b[2]).toFixed(1) + '" rx="3"/>' +
+             '<text class="v" x="' + (xs[i] + bw / 2) + '" y="' + (b[1] - 9).toFixed(1) +
+             '" text-anchor="middle">' + b[4] + "</text>" +
+             '<text class="k" x="' + (xs[i] + bw / 2) + '" y="' + (H - B + 18) +
+             '" text-anchor="middle">' + b[3] + "</text>";
+    }).join("");
+
+    // connectors: the top of gross carries across to the offset, and the floor
+    // of the offset carries across to the net.
+    var conn = '<line class="conn" x1="' + (xs[0] + bw) + '" y1="' + yv(gross).toFixed(1) +
+               '" x2="' + xs[1] + '" y2="' + yv(gross).toFixed(1) + '"/>' +
+               '<line class="conn" x1="' + (xs[1] + bw) + '" y1="' + yv(net).toFixed(1) +
+               '" x2="' + xs[2] + '" y2="' + yv(net).toFixed(1) + '"/>';
+
+    return '<svg class="wf" viewBox="0 0 ' + W + " " + H + '" role="img" ' +
+      'aria-label="Gross shortfall of ' + imp(gross) + ', reduced by ' + imp(offset) +
+      ' of over-delivery elsewhere, leaving a net shortfall of ' + imp(net) + '">' +
+      conn + bars +
+      '<line class="base" x1="' + L + '" y1="' + (T + plot) + '" x2="' + (W - R) +
+      '" y2="' + (T + plot) + '"/></svg>';
+  }
+
+  /* ---------------- campaign x market heatmap ----------------
+   * Answers a question ranked bars structurally cannot: is a market behind
+   * everywhere, or behind on one campaign? One hue at varying opacity -- a
+   * sequential encoding -- with the value printed in every cell, so the colour
+   * is a scanning aid and never the only way to read the number.
+   */
+  function heatmap() {
+    var markets = D.by_market.map(function (r) { return r.key; });
+    var cells = [], mx = 0;
+    D.campaigns.forEach(function (c) {
+      var by = {};
+      c.by_market.forEach(function (r) { by[r.key] = r.net_shortfall; });
+      markets.forEach(function (m) { mx = Math.max(mx, by[m] || 0); });
+      cells.push({ name: c.name, by: by });
+    });
+    if (mx <= 0) return "";
+
+    var head = "<tr><th></th>" + markets.map(function (m) {
+      return "<th>" + m + "</th>"; }).join("") + "</tr>";
+    var body = cells.map(function (row) {
+      return '<tr><th class="rowh" scope="row">' + esc(row.name) + "</th>" +
+        markets.map(function (m) {
+          var v = row.by[m] || 0;
+          // Over-delivery and zero read as "nothing to see", not as a second hue.
+          var w = v > 0 ? 0.06 + (v / mx) * 0.64 : 0;
+          return '<td style="--w:' + w.toFixed(3) + '"' + (v > 0 ? "" : ' class="zero"') +
+                 ' title="' + esc(row.name) + ' in ' + m + ': ' +
+                 (v > 0 ? imp(v) + " impressions short" : "no net shortfall") + '">' +
+                 (v > 0 ? imp(v) : "&middot;") + "</td>";
+        }).join("") + "</tr>";
+    }).join("");
+
+    var legend = '<div class="hmleg"><span>Less</span><span class="sc">' +
+      [0.06, 0.22, 0.38, 0.54, 0.70].map(function (w) {
+        return '<i style="--w:' + w + '"></i>'; }).join("") +
+      "</span><span>More net shortfall</span>" +
+      '<span style="margin-left:auto">&middot; means the market delivered at or above plan</span></div>';
+
+    return '<div class="hmwrap"><table class="hm"><thead>' + head +
+           "</thead><tbody>" + body + "</tbody></table></div>" + legend;
+  }
+
   /* ---------------- campaigns ---------------- */
   function renderCampaigns() {
     document.getElementById("campaignCards").innerHTML =
@@ -584,6 +830,13 @@
         "</span></span></div>" +
         (top ? '<p class="pnote"><b>' + cap(top.key) + "</b> accounts for " +
           top.share_pct.toFixed(0) + "% of this campaign's net shortfall.</p>" : "") +
+        '<div class="pbody" style="padding-bottom:0">' +
+          waterfall(c.gross_shortfall, c.over_delivery_offset, c.net_shortfall) +
+          '<p class="wfnote">' + imp(c.gross_shortfall) + " was missed across " +
+          c.placements_behind + " placements; " + imp(c.over_delivery_offset) +
+          " of over-delivery elsewhere is subtracted, so this campaign reports <b>" +
+          pct(c.variance_pct) + "</b> — hiding <b>" + Math.round(c.masking_pct) +
+          "%</b> of the gap." + info("masking") + "</p></div>" +
         '<div class="pbody"><div class="ranked">' +
           rankedBars(rows, "net_shortfall", "key", imp) + "</div>" +
         '<p class="pnote" style="padding:0;margin-top:16px">Gross shortfall ' + imp(c.gross_shortfall) +
@@ -663,6 +916,20 @@
   }
 
   function renderMarkets() {
+    var hm = document.getElementById("heatmap");
+    if (hm) {
+      hm.innerHTML = heatmap();
+      var worst = D.by_market[0];
+      var rows = D.campaigns.filter(function (c) {
+        var r = c.by_market.filter(function (x) { return x.key === worst.key; })[0];
+        return r && r.net_shortfall > 0;
+      }).length;
+      document.getElementById("heatNote").innerHTML =
+        "<b>" + worst.key + "</b> is behind on <b>" + rows + " of " + D.campaigns.length +
+        " campaigns</b>, which is why it leads the ranking below — the problem is " +
+        (rows > D.campaigns.length / 2 ? "systemic across the book, not one bad campaign."
+                                       : "concentrated in a small number of campaigns.");
+    }
     contribTable("#tMarket", D.by_market);
     contribTable("#tFormat", D.by_format);
     document.querySelector("#tFormat thead th").textContent = "Format";
@@ -797,6 +1064,12 @@
   }
 
   /* ---------------- boot ---------------- */
+  // Info affordances declared in the markup, injected where nesting a button
+  // inside another control would have been invalid.
+  [].forEach.call(document.querySelectorAll("[data-inject]"), function (el) {
+    el.innerHTML = info(el.dataset.inject);
+  });
+
   buildNav();
   initTheme();
   initFilters();
@@ -810,6 +1083,9 @@
   renderMethod();
 
   document.body.addEventListener("click", function (e) {
+    var ib = e.target.closest("[data-info]");
+    if (ib) { e.stopPropagation(); openPop(ib); return; }
+    if (!e.target.closest(".pop")) closePop();
     var go = e.target.closest("[data-go]");
     if (go) { show(go.dataset.go); return; }
     var pl = e.target.closest("[data-placement]");
@@ -826,7 +1102,7 @@
     if (e.target.id === "dclose" || e.target.id === "scrim") closeDrawer();
   });
   document.body.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") closeDrawer();
+    if (e.key === "Escape") { closePop(); closeDrawer(); }
     if (e.key === "Enter") {
       var row = e.target.closest && e.target.closest("tr[data-placement]");
       if (row) openDrawer(Number(row.dataset.placement));

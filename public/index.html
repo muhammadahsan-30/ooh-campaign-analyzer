@@ -69,6 +69,17 @@
     <div id="overviewCallout"></div>
 
     <div class="panel">
+      <div class="phead"><h2>Why the headline looks healthier than the book</h2>
+        <span class="phint">gross shortfall, what offsets it, and what is left</span></div>
+      <p class="pnote">Campaign reporting subtracts placements running ahead of plan from
+        placements running behind. This is the arithmetic that does it.</p>
+      <div class="pbody">
+        <div id="wfPortfolio"></div>
+        <p class="wfnote" id="wfNote"></p>
+      </div>
+    </div>
+
+    <div class="panel">
       <div class="phead"><h2>Campaign pacing</h2>
         <span class="phint">flight elapsed against delivery, both as a share of the full contract</span></div>
       <p class="pnote">Live campaigns first. The gap between the two bars is the pacing gap —
@@ -131,7 +142,7 @@
     <div class="fchips" id="fChips"></div>
 
     <div class="panel flat">
-      <div class="phead" style="padding-left:0"><h2>Live — still actionable</h2>
+      <div class="phead" style="padding-left:0"><h2>Live — still actionable<span data-inject="live_issue"></span></h2>
         <span class="phint">ranked by preventable exposure</span></div>
       <p class="pnote" style="padding-left:0">These placements are still in the air. The exposure
         shown is what continues to accrue if nothing changes, not what has already been lost.</p>
@@ -139,7 +150,7 @@
     </div>
 
     <div class="panel">
-      <div class="phead"><h2>Completed — reconciliation required</h2>
+      <div class="phead"><h2>Completed — reconciliation required<span data-inject="completed_short"></span></h2>
         <span class="phint">ranked by billed shortfall</span></div>
       <p class="pnote">Nothing here can be recovered by delivery. These are the make-good and
         credit conversations.</p>
@@ -167,6 +178,13 @@
       <h1 id="h-markets">Markets and formats</h1>
       <p>Where shortfall concentrates across the whole book, gross and net.</p>
     </div></div>
+    <div class="panel">
+      <div class="phead"><h2>Where delivery problems concentrate</h2>
+        <span class="phint">net shortfall, every campaign against every market</span></div>
+      <p class="pnote" id="heatNote"></p>
+      <div class="pbody"><div id="heatmap"></div></div>
+    </div>
+
     <div class="panel">
       <div class="phead"><h2>By market</h2><span class="phint">net shortfall</span></div>
       <div class="tablewrap"><table id="tMarket"><thead></thead><tbody></tbody></table></div>

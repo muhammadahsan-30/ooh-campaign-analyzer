@@ -420,7 +420,20 @@ def build_summary(df, con, as_of):
         "on_track": int((df["status"] == "on_track").sum()),
         "live_issues": int(len(live)),
         "completed_shortfalls": int(len(done)),
-        # Two different quantities. They are never added together on screen.
+        # TWO NAMED MEASURES OVER TWO POPULATIONS. They are not interchangeable
+        # and must never share a label:
+        #
+        #   flagged media-value exposure  - the 82 placements that breach the -5%
+        #                                   attention line. This is the number the
+        #                                   Attention Centre acts on.
+        #   total negative delivery       - every placement behind by any amount
+        #     exposure                      (227 here), which is the population
+        #                                   gross_shortfall is also measured over.
+        #
+        # Reporting the first beside gross shortfall without saying so compares a
+        # 227-placement impression figure against an 82-placement money figure.
+        # Both are exported so the interface can be explicit about which is which.
+        "total_negative_exposure": float(df["billed_shortfall"].sum()),
         "billed_shortfall": float(flagged["billed_shortfall"].sum()),
         "billed_shortfall_live": float(live["billed_shortfall"].sum()),
         "billed_shortfall_completed": float(done["billed_shortfall"].sum()),
