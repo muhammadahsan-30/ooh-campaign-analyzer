@@ -263,16 +263,10 @@
       " total.</p>" +
       '<button class="btn" type="button" data-go="attention">Review attention centre →</button></div>';
 
-    var det = S.detection;
-    document.getElementById("whyTrad").textContent =
-      "On this dataset a fault sat undetected for a median of " +
-      det.median_reconciliation_delay_days + " days between starting and the flight closing.";
-    document.getElementById("whyTool").textContent =
-      "Measured against contracted-to-date, the same faults crossed the alert line a median of " +
-      det.median_detection_delay_days + " days after they began — with a median of " +
-      det.median_days_remaining_at_detection + " days of flight still left to act in.";
-
+    // The detection medians used to live in a two-column word diagram here.
+    // The flight timeline carries them now, on a real placement.
     renderWaterfall();
+    renderTimeline();
     renderPacing();
     renderExposure();
   }
@@ -757,6 +751,115 @@
 
     return '<div class="hmwrap"><table class="hm"><thead>' + head +
            "</thead><tbody>" + body + "</tbody></table></div>" + legend;
+  }
+
+
+  /* ---------------- flight timeline ----------------
+   * The product's purpose in one picture, drawn from one real placement's
+   * delivery history rather than an illustration. Every day number, date and
+   * percentage below comes from the generated delivery rows.
+   *
+   * The honest point this has to carry: the analyzer DETECTS, it does not
+   * repair. The recovery marker says delivery returned to normal, not that the
+   * tool caused it to.
+   */
+  function flightTimeline(st) {
+    if (!st) return "";
+    var n = st.flight_days, run = st.elapsed_days;
+    var onset = st.onset_day, alert = st.alert_day, rec = st.recovery_day;
+    function pc(d) { return (d / n) * 100; }
+    function seg(cls, a, b) {
+      return b > a ? '<i class="' + cls + '" style="width:' + pc(b - a).toFixed(2) + '%"></i>' : "";
+    }
+    var impairedEnd = rec !== null ? rec : run;
+    var track = seg("s-healthy", 0, onset) +
+                seg("s-impaired", onset, impairedEnd) +
+                (rec !== null ? seg("s-recovered", rec, run) : "") +
+                (run < n ? seg("s-future", run, n) : "");
+
+    var marks = [[onset, "1"], [alert, "2"]];
+    if (rec !== null) marks.push([rec, "3"]);
+    marks.push([n, rec !== null ? "4" : "3"]);
+    var badges = marks.map(function (mk) {
+      return '<span class="tlb" style="left:' + pc(mk[0]).toFixed(2) + '%">' + mk[1] + "</span>";
+    }).join("");
+
+    // Built from HTML boxes rather than SVG: the badges must stay circular at
+    // every width, and a scaled SVG either squashes them or shrinks the whole
+    // component on a phone.
+    return '<div class="tlbar" role="img" aria-label="' +
+      "Flight timeline: delivery fell away on day " + (onset + 1) + ", was flagged on day " +
+      (alert + 1) + " with " + st.days_remaining_at_detection + " days still to run" +
+      (rec !== null ? ", and returned to normal on day " + (rec + 1) : "") + '">' +
+      '<span class="tlwin" style="left:' + pc(alert).toFixed(2) + '%;width:' +
+        pc(n - alert).toFixed(2) + '%"></span>' +
+      '<span class="tltrack">' + track + "</span>" + badges +
+      // Anchored to the day reporting actually stops, not floated in the middle
+      // of the row where it would point at nothing.
+      (run < n ? '<span class="tlnow" style="left:' + pc(run).toFixed(2) +
+                 '%">reported to ' + longdate(S.as_of) + "</span>" : "") +
+      "</div>";
+  }
+
+  function timelineSteps(st) {
+    var steps = [
+      ["1", "Delivery falls away",
+       "Day " + (st.onset_day + 1) + " &middot; " + dayDate(st.start, st.onset_day),
+       "The site had been delivering " + Math.round(st.pre_fault_index * 100) +
+       "% of what was planned. It drops to " + Math.round(st.fault_index * 100) + "%."],
+      ["2", "The analyzer flags it",
+       "Day " + (st.alert_day + 1) + " &middot; " + dayDate(st.start, st.alert_day),
+       "<b>" + days(st.detection_delay_days) + " later.</b> Enough delivery is now missing that " +
+       "the shortfall clears the alert line — with <b>" + days(st.days_remaining_at_detection) +
+       "</b> of the booking still to run."]
+    ];
+    if (st.recovery_day !== null) {
+      steps.push(["3", "Delivery returns to normal",
+        "Day " + (st.recovery_day + 1) + " &middot; " + dayDate(st.start, st.recovery_day),
+        "The site goes back to delivering to plan. The analyzer reports this; it does not " +
+        "cause it — fixing a dark screen happens in the real world."]);
+    }
+    steps.push([st.recovery_day !== null ? "4" : "3", "Flight ends — reconciliation",
+      "Day " + st.flight_days + " &middot; " + longdate(st.end),
+      "<b>" + days(st.reconciliation_delay_days) + " after the problem began.</b> " +
+      "This is when an end-of-campaign review would have found it by hand — the only " +
+      "point at which it would otherwise have been visible."]);
+
+    return '<ol class="tlsteps">' + steps.map(function (s) {
+      return "<li><span class='tn'>" + s[0] + "</span><span class='tb'>" +
+        "<span class='tt'>" + s[1] + "</span>" +
+        "<span class='td'>" + s[2] + "</span>" +
+        "<span class='tx'>" + s[3] + "</span></span></li>";
+    }).join("") + "</ol>";
+  }
+
+  function renderTimeline() {
+    var st = D.story, host = document.getElementById("timeline");
+    if (!host) return;
+    if (!st) { host.innerHTML = ""; return; }
+    document.getElementById("tlWho").innerHTML =
+      "<b>" + esc(st.city) + " &middot; " + cap(st.format) + "</b>, " + esc(st.area) +
+      " — one real placement on <b>" + esc(st.campaign_name) + "</b> (" + esc(st.client) +
+      "), booked for " + days(st.flight_days) + ".";
+    // Chart chrome as HTML rather than SVG text: the SVG scales to the
+    // container, and anything written inside it shrinks with it -- at phone
+    // width the labels came out around 6px. Out here they stay readable.
+    host.innerHTML =
+      '<p class="tl-winlab"><i></i>' + days(st.days_remaining_at_detection) +
+        " of flight still to run when it was flagged</p>" +
+      flightTimeline(st) +
+      '<p class="tl-ends"><span>Campaign starts &middot; ' + longdate(st.start) + "</span>" +
+
+        "<span>Flight ends &middot; " + longdate(st.end) + "</span></p>" +
+      timelineSteps(st);
+    var det = S.detection;
+    document.getElementById("tlMedian").innerHTML =
+      "This placement is one case. Across every fault the analyzer found in the book, the " +
+      "median was <b>" + det.median_detection_delay_days + " days</b> from delivery falling " +
+      "away to being flagged, against <b>" + det.median_reconciliation_delay_days +
+      " days</b> until the flight ended — with a median <b>" +
+      det.median_days_remaining_at_detection + " days</b> of booking still to run at the " +
+      "moment it was flagged." + info("detection");
   }
 
   /* ---------------- campaigns ---------------- */

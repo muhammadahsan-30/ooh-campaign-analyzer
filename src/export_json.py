@@ -155,6 +155,7 @@ def placement_record(r):
         "onset_day": None if pd.isna(r.observed_onset_day) else int(r.observed_onset_day),
         "alert_day": None if pd.isna(r.alert_day) else int(r.alert_day),
         "recovered": bool(r.recovered),
+        "recovery_day": None if pd.isna(r.recovery_day) else int(r.recovery_day),
         "detection_delay_days": None if pd.isna(r.detection_delay_days) else int(r.detection_delay_days),
         "reconciliation_delay_days": None if pd.isna(r.reconciliation_delay_days) else int(r.reconciliation_delay_days),
         "days_remaining_at_detection": None if pd.isna(r.days_remaining_at_detection) else int(r.days_remaining_at_detection),
@@ -453,6 +454,46 @@ def build_summary(df, con, as_of):
     }
 
 
+def build_story(df):
+    """
+    One real placement whose delivery history shows the whole arc.
+
+    The flight timeline on the Overview explains what this product is for, and it
+    does so with an actual placement rather than an illustration. Selection is
+    deterministic: the longest flight among placements that developed a fault,
+    were flagged, and then recovered -- longest because a long flight spaces the
+    events far enough apart to read. If nothing recovered, the longest flagged
+    flight is used instead and the timeline simply has no recovery marker.
+    """
+    has_fault = df["observed_onset_day"].notna() & df["alert_day"].notna()
+    pick = df[has_fault & df["recovered"]]
+    if pick.empty:
+        pick = df[has_fault]
+    if pick.empty:
+        return None
+    r = pick.sort_values(["flight_days", "shortfall"], ascending=[False, False]).iloc[0]
+    return {
+        "placement_id": int(r["placement_id"]),
+        "campaign_name": r["campaign_name"], "client": r["client_name"],
+        "city": r["city"], "area": r["area"], "format": r["format"],
+        "site_id": int(r["site_id"]),
+        "start": r["start_date"], "end": r["end_date"],
+        "flight_days": int(r["flight_days"]), "elapsed_days": int(r["elapsed_days"]),
+        "in_flight": bool(r["in_flight"]),
+        "onset_day": int(r["observed_onset_day"]),
+        "alert_day": int(r["alert_day"]),
+        "recovery_day": None if pd.isna(r["recovery_day"]) else int(r["recovery_day"]),
+        "recovered": bool(r["recovered"]),
+        "detection_delay_days": int(r["detection_delay_days"]),
+        "reconciliation_delay_days": int(r["reconciliation_delay_days"]),
+        "days_remaining_at_detection": int(r["days_remaining_at_detection"]),
+        "pre_fault_index": num(r["pre_fault_index"]),
+        "fault_index": num(r["fault_index"]),
+        "shortfall": float(r["shortfall"]),
+        "billed_shortfall": float(r["billed_shortfall"]),
+    }
+
+
 def slim(r):
     """A placement as a contribution-table row: identity, size, and impact."""
     return {
@@ -511,6 +552,7 @@ def main():
     payload = {
         "generated_note": "All data synthetic, modelled on the Canadian out-of-home market (CMA populations, Canadian format names, rate cards from published market benchmarks). Figures in CAD. No real agency or client data.",
         "summary": build_summary(df, con, as_of),
+        "story": build_story(df),
         "campaigns": campaigns,
         "attention": {
             "live": [placement_record(r) for r in live.itertuples()],

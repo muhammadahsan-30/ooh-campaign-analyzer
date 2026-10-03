@@ -136,7 +136,7 @@ language. **Data:** already in the payload.
 **Question:** "What is this product actually for?"
 **Why visual:** This is the thesis. One horizontal timeline with four marks and a shaded
 "intervention window" explains the whole project faster than the two-column word diagram
-currently there. Uses real medians: fault begins, flagged 2.5 days later, 38 days of
+currently there. Uses real medians: fault begins, flagged 4 days later, 35 days of
 usable flight remain, reconciliation would have found it at day 31. **Placement:**
 Overview, replacing the current "Why this exists" columns; repeated in Method.
 
@@ -536,3 +536,36 @@ open.
 **The one thing to confirm before scheduling P1:** whether a Windows machine or VM is
 available. If not, Tableau Public is the macOS-native substitute that still publishes a
 live link — weaker as a keyword, stronger as a clickable artifact.
+
+---
+
+## 19. Feature freeze
+
+With the flight timeline shipped, the web application is **feature-frozen**.
+
+| Item | State |
+|---|---|
+| P0-1 explain layer | ✅ shipped |
+| P0-2 Attention Centre visuals | ✅ shipped |
+| P0-3 gross → offset → net waterfall | ✅ shipped |
+| P0-4 market contribution heatmap | ✅ shipped |
+| P0-8 exposure definitions | ✅ shipped |
+| **Flight timeline** (§4, originally P0-4 in this document) | ✅ shipped |
+| P1-6 Pareto on exposure | ⏸ not started, deliberately |
+| P2-7 small multiples | ⏸ not started, deliberately |
+| Power BI companion | ⏸ specified in `docs/powerbi-plan.md`, not started |
+
+### Defect found and fixed while building the timeline
+
+Choosing a real exemplar surfaced a genuine metric bug. `alert_crossing_day()` evaluated
+the cumulative prorated variance from day one, where that "cumulative" figure is a single
+day — and a perfectly healthy day sits as low as 0.92 of plan, below the −5% line. The
+result was 45 alerts on placements that never broke, 60 alerts preceding their own cause,
+and 15 negative detection delays.
+
+A 14-day minimum window removes all three (45 → 0, 60 → 0, 15 → 0) and *raises* the number
+of faults with a correctly measured delay from 75 to 90. Published medians moved from 2.5
+to 4 days detection, and from 38 to 35 days of flight remaining at detection. Three tests
+cover it; two existing tests that had encoded the buggy behaviour were corrected.
+
+Next phase is the portfolio redesign, not further analyzer work.

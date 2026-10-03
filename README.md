@@ -110,12 +110,17 @@ generator's fault log.
 | Faults generated | 119, of which **104 began** inside the reported window |
 | Faults recovered from delivery data alone | **102 — 98.1%** |
 | Median error in the inferred fault start date | **0 days** |
-| Median delay from fault onset to crossing the −5% alert line | **2.5 days** |
+| Median delay from fault onset to crossing the −5% alert line | **4 days** |
 | Median delay from fault onset to end of flight | **31 days** |
-| Median flight remaining when a placement was flagged | **38 days** |
+| Median flight remaining when a placement was flagged | **35 days** |
 | Faults repaired mid-flight | 32 |
 
-The gap between **2.5 days** and **31 days** is the entire argument for the tool. The
+A cumulative read is held until **14 days** of delivery have run. Without that guard the
+alert fires on 45 placements that never developed a fault, and 15 detection delays come
+out negative — the "cumulative" variance on day one *is* a single day, and a healthy day
+sits as low as 92% of plan. Documented in [docs/assumptions.md](docs/assumptions.md).
+
+The gap between **4 days** and **31 days** is the entire argument for the tool. The
 second number is when an end-of-campaign reconciliation would have found the same fault
 by hand.
 
@@ -169,6 +174,14 @@ the theme choice persisted. The status palette is validated for colour-vision de
 and every status is a glyph plus a word, never colour alone.
 
 ![Markets heatmap](docs/screenshots/04-markets.png)
+
+**The flight timeline** explains what the product is for, using one real placement's
+delivery history rather than an illustration — a Montreal digital screen that ran at 99%
+of plan, fell to 72% on day 34, was flagged on day 40 with 44 days of booking still to
+run, and returned to normal on day 49. An end-of-campaign reconciliation would not have
+found it until day 84.
+
+![Flight timeline](docs/screenshots/06-timeline.png)
 
 Every figure a general reader might not know carries an **i** affordance — click or
 keyboard — giving a one-sentence plain-English reading and a route into the methodology.

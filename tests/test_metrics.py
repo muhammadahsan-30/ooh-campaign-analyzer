@@ -224,9 +224,10 @@ def test_three_bad_days_are_a_fault_and_onset_is_the_first_of_them():
 
 
 def test_alert_crosses_when_cumulative_delivery_falls_below_the_line():
-    # Three full days then three dark ones: by day 3 cumulative is 300 against
-    # 400 expected, which is -25% and well past the -5% line.
-    assert m.alert_crossing_day([100, 100, 100, 0, 0, 0], PLANNED) == 3
+    # The threshold arithmetic on its own, with the minimum window lifted so it
+    # can be read in isolation: three full days then three dark ones, so by day
+    # 3 cumulative is 300 against 400 expected -- -25%, well past the -5% line.
+    assert m.alert_crossing_day([100, 100, 100, 0, 0, 0], PLANNED, min_days=1) == 3
 
 
 def test_alert_does_not_cross_on_normal_variation():
@@ -246,15 +247,17 @@ def test_fault_then_repair_is_recorded_as_recovered():
 
 def test_detection_delay_is_measured_against_reconciliation():
     # The whole claim in one test. Fault starts on day 10 of a 20-day flight.
-    # Cumulative delivery crosses -5% on day 11 -- one day later. End-of-campaign
-    # reconciliation would not have found it for another 10 days.
+    # The cumulative read is held until 14 days have run (MIN_ALERT_DAYS), and
+    # fires the moment it is allowed to: by then 10 full days and 4 dark ones
+    # give 1,200 against 1,400 expected, which is -14.3%.
     t = m.detection_timeline([100] * 10 + [50] * 10, PLANNED, flight_days=20)
     assert t["observed_onset_day"] == 10
-    assert t["alert_day"] == 11
-    assert t["detection_delay_days"] == 1
+    assert t["alert_day"] == 13
+    assert t["detection_delay_days"] == 3
+    # Reconciliation would not have found it for another 10 days.
     assert t["reconciliation_delay_days"] == 10
-    # 20-day flight, flagged at the close of day 11: 8 days left to act in.
-    assert t["days_remaining_at_detection"] == 8
+    # 20-day flight, flagged at the close of day 14: 6 days left to act in.
+    assert t["days_remaining_at_detection"] == 6
 
 
 def test_a_late_fault_can_be_real_without_crossing_the_alert_line():
@@ -378,3 +381,27 @@ def test_exposure_falls_back_to_the_cumulative_rate_when_none_is_given():
     df = pd.DataFrame([dict(placement(contracted=1000, verified=450), spend=50.0)])
     assert (m.exposure(df, as_of="2026-01-05", current_index=[None]).iloc[0]["daily_bleed"]
             == m.exposure(df, as_of="2026-01-05").iloc[0]["daily_bleed"])
+
+
+def test_a_single_noisy_early_day_does_not_raise_an_alert():
+    # Day one at 92% of plan, everything after it healthy. The cumulative read
+    # on day one IS that day, so without a minimum window this would flag a
+    # placement that was never broken.
+    series = [92] + [100] * 40
+    assert m.alert_crossing_day(series, PLANNED) is None
+
+
+def test_the_alert_waits_for_a_meaningful_window():
+    # Dark from day one. The shortfall is real and enormous, but the alert still
+    # holds until the minimum window has run, and then fires immediately.
+    assert m.alert_crossing_day([0] * 40, PLANNED) == m.MIN_ALERT_DAYS - 1
+
+
+def test_detection_delay_is_never_negative():
+    # A fault late in a long flight: the alert cannot precede the onset, which
+    # is what the minimum window exists to guarantee.
+    series = [100] * 40 + [40] * 20
+    t = m.detection_timeline(series, PLANNED, flight_days=60)
+    assert t["observed_onset_day"] == 40
+    assert t["alert_day"] >= t["observed_onset_day"]
+    assert t["detection_delay_days"] >= 0

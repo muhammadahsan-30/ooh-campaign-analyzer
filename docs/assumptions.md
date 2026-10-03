@@ -288,6 +288,34 @@ work without them: the evaluation above measures whether delivery problems are
 inventory. If the analyzer could read the generator's answer, the 98.1% would be a
 tautology rather than a result.
 
+## A cumulative read needs a minimum window
+
+`alert_crossing_day()` will not fire until **14 days** of delivery have run.
+
+Without that guard the test is unreliable exactly where it is weakest. On day one the
+"cumulative" variance *is* that single day, and a perfectly healthy day sits as low as
+0.92 of plan — already past the −5% line. Measured on this dataset, removing the guard
+produces:
+
+| | No minimum | 14-day minimum |
+|---|---|---|
+| Alerts on placements that never developed a fault | **45** | **0** |
+| Alerts firing before the fault even began | 60 | 0 |
+| Negative detection delays (nonsensical) | 15 | 0 |
+| Faults caught with a meaningful delay measured | 75 | **90** |
+| Median detection delay | 3 days | 4 days |
+
+Fourteen days is where the pathology disappears completely, and the number of real faults
+with a correctly measured delay *rises*, because the statistic stops being polluted by
+alerts that preceded their own cause. The cost is one day of median detection — still 4
+days against 31 to reconciliation.
+
+This is the "widen the threshold when few days have elapsed" limitation the README has
+always listed, made concrete for the one place it was actively distorting a published
+figure. It does **not** affect the headline flag count: `delivery_variance_ranked()` is
+evaluated once at the as-of date, where every placement has far more than 14 days behind
+it.
+
 ## Detection delay against reconciliation delay
 
 Two numbers, both derived from the above:
@@ -297,7 +325,7 @@ Two numbers, both derived from the above:
 
 The first is when this tool would have shown the problem. The second is when an
 end-of-campaign reconciliation would have found it by hand. On the current dataset the
-medians are **2.5 days against 31 days**, with a median of **38 days of flight still
+medians are **4 days against 31 days**, with a median of **35 days of flight still
 remaining** when a placement was flagged.
 
 That gap is the entire argument for the tool, which is why it is computed rather than

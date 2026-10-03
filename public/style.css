@@ -582,3 +582,45 @@ footer nav{display:flex; gap:var(--sp-4)}
   .srow{grid-template-columns:84px 1fr; }
   .srow .sv{grid-column:2; text-align:left}
 }
+
+/* ---------- flight timeline ---------- */
+.tlbar{position:relative; padding-top:16px; margin:0 0 var(--sp-2)}
+.tltrack{display:flex; gap:0; height:30px; border-radius:4px; overflow:hidden}
+.tltrack i{display:block; height:100%}
+/* Healthy and recovered are the SAME state -- delivering to plan -- so they get
+   the same fill. The badges carry the narrative; a brighter green at the end
+   would imply recovery beat the plan, which it did not. */
+.tltrack .s-healthy,.tltrack .s-recovered{background:var(--ok); opacity:.6}
+.tltrack .s-impaired{background:var(--alert)}
+.tltrack .s-future{background:var(--surface-sunken);
+  box-shadow:inset 0 0 0 1px var(--border-strong)}
+.tlwin{position:absolute; top:0; height:9px; border-radius:2px;
+  background:var(--accent); opacity:.22}
+.tlb{position:absolute; top:24px; transform:translateX(-50%);
+  width:26px; height:26px; border-radius:50%; display:grid; place-items:center;
+  background:var(--surface-raised); border:1.5px solid var(--text);
+  font-size:var(--fs-xs); font-weight:600; font-variant-numeric:tabular-nums}
+.tl-winlab{display:flex; align-items:center; gap:var(--sp-2); margin:0 0 var(--sp-2);
+  font-size:var(--fs-xs); color:var(--accent); font-weight:500}
+.tl-winlab i{width:18px; height:9px; border-radius:2px; background:var(--accent);
+  opacity:.22; flex:none; display:block}
+.tl-ends{display:flex; justify-content:space-between; gap:var(--sp-3); flex-wrap:wrap;
+  margin:var(--sp-6) 0 var(--sp-5); font-size:var(--fs-xs); color:var(--text-3)}
+.tlnow{position:absolute; top:56px; transform:translateX(-50%); white-space:nowrap;
+  font-size:10.5px; color:var(--text-3)}
+.tlnow::before{content:""; position:absolute; left:50%; top:-12px; width:1px; height:10px;
+  background:var(--border-strong)}
+
+.tlsteps{list-style:none; margin:0; padding:0; display:grid; gap:var(--sp-3)}
+.tlsteps li{display:grid; grid-template-columns:26px 1fr; gap:var(--sp-3); align-items:start}
+.tlsteps .tn{width:22px; height:22px; border-radius:50%; display:grid; place-items:center;
+  border:1.5px solid var(--text); font-size:var(--fs-xs); font-weight:600; margin-top:1px}
+.tlsteps .tb{display:grid; gap:2px}
+.tlsteps .tt{font-size:var(--fs-h3); font-weight:600}
+.tlsteps .td{font-size:var(--fs-xs); color:var(--text-3); font-variant-numeric:tabular-nums}
+.tlsteps .tx{font-size:var(--fs-sm); color:var(--text-2); line-height:1.55; margin-top:2px}
+.tlsteps b{color:var(--text); font-weight:600}
+@media (max-width:620px){
+  .tl{max-width:none}
+  .tl .tl-win,.tl .tl-end{font-size:13px}
+}
