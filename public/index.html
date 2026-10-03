@@ -4,182 +4,264 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OOH Campaign Performance Analyzer</title>
-<meta name="description" content="Finds under-delivering out-of-home advertising inventory continuously, rather than at end of campaign. Built in Python and SQL by Muhammad Ahsan Sheikh.">
-<meta name="theme-color" content="#0d1117">
+<meta name="description" content="Measures every out-of-home placement against the impressions contracted by today, surfaces under-delivery that campaign-level reporting hides, and separates what can still be fixed in flight from what has to be reconciled. Python, pandas, SQL.">
+<meta name="theme-color" content="#f7f7f5">
 <meta property="og:title" content="OOH Campaign Performance Analyzer">
-<meta property="og:description" content="Finds under-delivering advertising inventory continuously instead of at end of campaign. Python, pandas, SQL.">
+<meta property="og:description" content="Finds under-delivering out-of-home inventory while the campaign is still running, and prices what it is worth.">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23ff7a45'/><text y='70' x='50' text-anchor='middle' font-size='54' font-weight='bold' font-family='Helvetica,Arial' fill='%230d1117'>OA</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23141413'/><rect x='24' y='24' width='30' height='30' rx='6' fill='%23fcfcfb'/><rect x='46' y='46' width='30' height='30' rx='6' fill='%232a78d6'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 
-<div class="bar">
+<header class="bar">
   <div class="barin">
     <div class="brand">
-      <div class="logo">OA</div>
-      <div class="brandtext">
-        <div class="nm">OOH Campaign Performance Analyzer</div>
-        <div class="sb" id="brandsub">Delivery reconciliation &middot; synthetic dataset</div>
-      </div>
+      <div class="mark" aria-hidden="true"><span></span></div>
+      <div class="brandname">OOH Campaign Analyzer</div>
     </div>
-    <nav class="barlinks">
-      <a class="hide-sm" href="https://github.com/muhammadahsan-30/ooh-campaign-analyzer" target="_blank" rel="noopener">Source</a>
-      <a class="cta" href="../index.html">← Portfolio</a>
-    </nav>
-  </div>
-</div>
-
-<div class="wrap">
-
-  <p class="synthetic">
-    <span class="ico">i</span>
-    <span><b>All data on this page is synthetic.</b> Generated from a model of how out-of-home
-    advertising is structured, with a fixed random seed so results are reproducible. No real
-    agency or client data is used anywhere in this project, and the brand names are invented.
-    The model is built on Canadian OOH market parameters — CMA populations, Canadian format
-    names and rate cards drawn from published market benchmarks — and all figures are in CAD.</span>
-  </p>
-
-  <p class="asof" id="asof"></p>
-
-  <div class="cards" id="cards"></div>
-  <div class="rail" id="rail"></div>
-
-  <div class="toolbar">
-    <div class="fg"><label for="fClient">Client</label>
-      <select id="fClient"><option value="">All clients</option></select></div>
-    <div class="fg"><label for="fCity">City</label>
-      <select id="fCity"><option value="">All cities</option></select></div>
-    <div class="fg"><label for="fFormat">Format</label>
-      <select id="fFormat"><option value="">All formats</option></select></div>
-    <button id="reset" type="button">Reset</button>
-    <span class="count" id="count"></span>
-  </div>
-
-  <div class="panel">
-    <div class="phead"><span class="idx">01</span><h2>Under-delivering placements</h2>
-      <span class="hint">worst first · flagged below &minus;5%</span></div>
-    <p class="pnote">Variance is verified impressions against contracted impressions <em>prorated to the days elapsed</em>, so a flight still in the air is judged on the days that have actually run — a healthy placement three weeks into a twelve weeks does not appear here. Rows marked <span class="pill live">LIVE</span> are still running and can still be fixed. This is the table that would otherwise be assembled by hand at end of campaign.</p>
-    <div class="tablewrap">
-      <table id="tWorst">
-        <thead><tr>
-          <th class="rank">#</th><th>Client</th><th>City</th><th>Format</th>
-          <th class="num">Flight</th>
-          <th class="num">Contracted to date</th><th class="num">Delivered</th>
-          <th class="num">Variance</th><th class="num">Spend (CAD)</th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <div class="tablemore"><button id="moreWorst" type="button" hidden></button></div>
-  </div>
-
-  <div class="chartgrid">
-    <div class="panel">
-      <div class="phead"><span class="idx">02</span><h2>Delivery against plan</h2></div>
-      <div class="pbody"><div class="chartbox"><canvas id="cMonthly"></canvas></div></div>
-    </div>
-    <div class="panel">
-      <div class="phead"><span class="idx">03</span><h2>Cost efficiency by format</h2>
-        <span class="hint">lower is better</span></div>
-      <div class="pbody"><div class="chartbox"><canvas id="cFormat"></canvas></div></div>
-      <p class="pnote">Read this <em>within</em> a format, not across it. A digital face rotates in a shared loop, so its impressions are a share of loop time rather than the exclusive presence a static bulletin holds for the whole flight — comparing the two CPMs head to head overstates static's efficiency.</p>
+    <nav class="nav" id="nav" aria-label="Sections"></nav>
+    <div class="barend">
+      <span class="asof" id="asofchip"></span>
+      <button class="iconbtn" id="themebtn" type="button" aria-label="Switch colour theme">◐</button>
     </div>
   </div>
+</header>
 
-  <div class="panel">
-    <div class="phead"><span class="idx">04</span><h2>Campaigns</h2>
-      <span class="hint">reach is modeled per market, then summed &middot; estimates</span></div>
-    <p class="pnote">Spend, delivery and variance are all <em>to date</em>. <span class="pill live">LIVE</span> marks a campaign still in the air, with the days elapsed against the booked flight beside it. <em>Showing</em> is the daily showing level — daily impressions as a percentage of the combined population of the markets the campaign ran in, so a #50 showing is a market weight, not a flight total.</p>
-    <div class="tablewrap">
-      <table id="tCamp">
-        <thead><tr>
-          <th>Client</th><th>Objective</th><th class="num">Flight</th>
-          <th class="num">Markets</th>
-          <th class="num">Placements</th><th class="num">Spend (CAD)</th>
-          <th class="num">Delivered</th><th class="num">Variance</th>
-          <th class="num">CPM</th><th class="num">Reach</th><th class="num">Freq.</th>
-          <th class="num">Showing</th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
+<main id="main" class="wrap">
 
-  <div class="lede">
-    <h2>Why this exists</h2>
-    <p>
-      Out-of-home advertising runs on <em>estimated</em> impressions. A bulletin does not know who
-      saw it. Sites go dark, posters get damaged, digital screens have downtime, and agencies
-      typically discover all of it by hand at end of campaign, during reconciliation.
+  <!-- ============ OVERVIEW ============ -->
+  <section class="view" id="v-overview" aria-labelledby="h-overview">
+    <p class="synthetic">
+      <span aria-hidden="true">ⓘ</span>
+      <span><b>All data on this page is synthetic.</b> Generated with a fixed random seed from a
+      model of the Canadian out-of-home market — CMA populations, Canadian format names, rate
+      cards from published market benchmarks. No real agency or client data is used anywhere,
+      and the brand names are invented. All figures in CAD.</span>
     </p>
-    <p>
-      I watched that reconciliation happen for five months from inside the agency, then built this.
-      It ranks under-delivering inventory <em>while the flight is still running</em>: every placement
-      is measured against its contracted impressions prorated to the days elapsed, so a live campaign
-      is judged on the days that have actually run rather than penalised for the ones that have not
-      happened yet. The number that matters is <em>spend at risk</em>: billed money attached to
-      placements that are behind what was contracted.
-    </p>
-  </div>
 
-  <div class="panel" id="howto">
-    <div class="phead"><span class="idx">05</span><h2>How to use this</h2>
-      <span class="hint">four steps, about a minute</span></div>
-    <ol class="steps">
-      <li><b>Read the KPI strip.</b> Two amber cards lead: how many placements breached the flag line, and what that shortfall is worth in billed spend. The rest give spend billed to date, impressions delivered against contracted to date, and the discount achieved off rate card. Everything is measured to the as-of date above the strip.</li>
-      <li><b>Open panel 01.</b> Every placement more than 5% behind contract for the days that have run, worst first. Rows marked LIVE are still in the air — those are the ones worth a phone call, because there is still flight left to make the shortfall up in.</li>
-      <li><b>Filter to a client or city.</b> The table and the count re-filter live. Pick a client and you have the reconciliation conversation for that account, ready to have.</li>
-      <li><b>Check panel 03 before renewing.</b> Cost per thousand by format, on verified rather than contracted delivery. This is which inventory type is actually efficient once you account for what really ran — read within a format, not across, for the reason under the chart.</li>
-    </ol>
-  </div>
+    <div class="intro">
+      <div>
+        <div class="eyebrow">OOH Campaign Performance Analyzer</div>
+        <h1 id="h-overview">Know what's falling behind before the campaign ends.</h1>
+        <p>Every placement measured against the impressions contracted <em>by today</em>,
+           priced in media value, and split by whether anything can still be done about it.</p>
+      </div>
+      <button class="btn" id="go-attention" type="button">Review attention centre →</button>
+    </div>
 
-  <div class="panel">
-    <div class="phead"><span class="idx">06</span><h2>How it works</h2></div>
-    <div class="grid3">
-      <div class="tile">
-        <span class="tn">01 / DATA</span>
-        <h3>Normalized data model</h3>
-        <p>Four tables, sites and campaigns and placements and delivery, with enforced foreign keys. A placement joins a campaign to a site over a date window; delivery records what it achieved each day.</p>
+    <div class="hero">
+      <div>
+        <div class="herofig num" id="heroFig">—</div>
+        <div class="herolab">Delivery to plan</div>
+        <div class="herosub" id="heroSub"></div>
+        <div class="healthbar" id="healthBar" role="img" aria-label="Placement health"></div>
+        <div class="healthleg" id="healthLeg"></div>
+        <div class="hidden-note" id="hiddenNote"></div>
       </div>
-      <div class="tile">
-        <span class="tn">02 / METRICS</span>
-        <h3>Tested metrics layer</h3>
-        <p>Prorated delivery variance, spend to date, CPM, rate efficiency, daily showing level and a reach estimate. Each function does one thing and is unit-tested against inputs small enough to check by hand — including the mid-flight case, where a healthy placement must not flag.</p>
-      </div>
-      <div class="tile">
-        <span class="tn">03 / SQL</span>
-        <h3>Analytical SQL</h3>
-        <p>CTEs and window functions. <code>ROW_NUMBER() OVER (PARTITION BY …)</code> to rank the worst sites inside each campaign, <code>LAG()</code> for month-over-month change per client.</p>
+      <div class="states" id="states"></div>
+    </div>
+
+    <div id="overviewCallout"></div>
+
+    <div class="panel">
+      <div class="phead"><h2>Campaign pacing</h2>
+        <span class="phint">flight elapsed against delivery, both as a share of the full contract</span></div>
+      <p class="pnote">Live campaigns first. The gap between the two bars is the pacing gap —
+        a campaign whose delivery bar trails its flight bar is behind where it should be today.</p>
+      <div class="pbody"><div class="cards" id="pacingBoard"></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="phead"><h2>Where the exposure is</h2>
+        <span class="phint">net shortfall by market</span></div>
+      <p class="pnote" id="exposureNote"></p>
+      <div class="pbody"><div class="ranked" id="exposureBars"></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="phead"><h2>Why this exists</h2></div>
+      <div class="pbody">
+        <div class="why">
+          <div class="whycol">
+            <h3>Traditional reconciliation</h3>
+            <div class="flow">
+              <em>Campaign runs</em><span class="arr">→</span><em>Campaign ends</em>
+              <span class="arr">→</span><em>Delivery reviewed</em><span class="arr">→</span>
+              <em>Problem found</em>
+            </div>
+            <p id="whyTrad"></p>
+          </div>
+          <div class="whycol tool">
+            <h3>This analyzer</h3>
+            <div class="flow">
+              <em>Campaign runs</em><span class="arr">→</span><em>Delivery monitored</em>
+              <span class="arr">→</span><em class="hit">Problem detected</em>
+              <span class="arr">→</span><em class="hit">Action still possible</em>
+            </div>
+            <p id="whyTool"></p>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="panel">
-    <div class="phead"><span class="idx">07</span><h2>Assumptions</h2>
-      <span class="hint">every figure here rests on these</span></div>
-    <dl id="assump" style="margin:0"></dl>
-  </div>
+  <!-- ============ ATTENTION ============ -->
+  <section class="view" id="v-attention" aria-labelledby="h-attention">
+    <div class="intro">
+      <div>
+        <div class="eyebrow">Detect · Prioritize</div>
+        <h1 id="h-attention"><span class="num" id="attFig"></span> still preventable</h1>
+        <p id="attSub"></p>
+      </div>
+    </div>
 
-  <p class="pnote" style="padding:0">
-    All out-of-home reach reporting rests on assumptions like these. The difference is that
-    these are written down where someone can argue with them.
-  </p>
+    <div class="filters" id="filters">
+      <select id="fCampaign" aria-label="Filter by campaign"><option value="">All campaigns</option></select>
+      <select id="fCity" aria-label="Filter by market"><option value="">All markets</option></select>
+      <select id="fFormat" aria-label="Filter by format"><option value="">All formats</option></select>
+      <input type="search" id="fSearch" placeholder="Search placements…" aria-label="Search placements">
+      <button class="btn ghost" id="fReset" type="button">Reset</button>
+      <span class="count" id="fCount"></span>
+    </div>
+    <div class="fchips" id="fChips"></div>
+
+    <div class="panel flat">
+      <div class="phead" style="padding-left:0"><h2>Live — still actionable</h2>
+        <span class="phint">ranked by preventable exposure</span></div>
+      <p class="pnote" style="padding-left:0">These placements are still in the air. The exposure
+        shown is what continues to accrue if nothing changes, not what has already been lost.</p>
+      <div class="pbody" style="padding-left:0;padding-right:0"><div class="issues" id="liveIssues"></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="phead"><h2>Completed — reconciliation required</h2>
+        <span class="phint">ranked by billed shortfall</span></div>
+      <p class="pnote">Nothing here can be recovered by delivery. These are the make-good and
+        credit conversations.</p>
+      <div class="tablewrap"><table id="tDone"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ============ CAMPAIGNS ============ -->
+  <section class="view" id="v-campaigns" aria-labelledby="h-campaigns">
+    <div id="campaignList">
+      <div class="intro"><div>
+        <div class="eyebrow">Investigate</div>
+        <h1 id="h-campaigns">Campaigns</h1>
+        <p>Live campaigns first, then closed flights by billed shortfall.</p>
+      </div></div>
+      <div class="cards" id="campaignCards"></div>
+    </div>
+    <div id="campaignDetail" hidden></div>
+  </section>
+
+  <!-- ============ MARKETS ============ -->
+  <section class="view" id="v-markets" aria-labelledby="h-markets">
+    <div class="intro"><div>
+      <div class="eyebrow">Investigate</div>
+      <h1 id="h-markets">Markets and formats</h1>
+      <p>Where shortfall concentrates across the whole book, gross and net.</p>
+    </div></div>
+    <div class="panel">
+      <div class="phead"><h2>By market</h2><span class="phint">net shortfall</span></div>
+      <div class="tablewrap"><table id="tMarket"><thead></thead><tbody></tbody></table></div>
+    </div>
+    <div class="panel">
+      <div class="phead"><h2>By format</h2><span class="phint">net shortfall</span></div>
+      <div class="tablewrap"><table id="tFormat"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ============ INVENTORY ============ -->
+  <section class="view" id="v-inventory" aria-labelledby="h-inventory">
+    <div class="intro"><div>
+      <div class="eyebrow">Investigate</div>
+      <h1 id="h-inventory">Inventory reliability</h1>
+      <p>Sites are rebooked across campaigns, so "does this site deliver when we book it?"
+         is a question the data can be asked.</p>
+    </div></div>
+    <div id="inventoryVerdict"></div>
+    <div class="panel">
+      <div class="phead"><h2>Site delivery history</h2>
+        <span class="phint">worst delivery first · impression-weighted</span></div>
+      <div class="tablewrap"><table id="tInv"><thead></thead><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ============ EFFICIENCY ============ -->
+  <section class="view" id="v-efficiency" aria-labelledby="h-efficiency">
+    <div class="intro"><div>
+      <div class="eyebrow">Reconcile</div>
+      <h1 id="h-efficiency">Cost efficiency</h1>
+      <p>What a thousand impressions actually cost, compared only where comparison is valid.</p>
+    </div></div>
+    <div class="panel">
+      <div class="phead"><h2>Static formats</h2><span class="phint">lower is better</span></div>
+      <p class="pnote">Bulletins, transit shelters and mall panels all hold the face exclusively
+        for the whole flight, so their CPMs are directly comparable with each other.</p>
+      <div class="pbody"><div class="ranked" id="cpmStatic"></div></div>
+    </div>
+    <div class="panel">
+      <div class="phead"><h2>Digital screens</h2><span class="phint">not ranked against static</span></div>
+      <p class="pnote" id="digitalNote"></p>
+      <div class="pbody"><div class="ranked" id="cpmDigital"></div></div>
+    </div>
+    <div class="panel">
+      <div class="phead"><h2>CPM premium from under-delivery</h2>
+        <span class="phint">comparable across every format</span></div>
+      <p class="pnote">Delivered CPM against contracted CPM. Because it is a ratio taken
+        <em>within</em> a format, comparing it across formats is legitimate: it asks how much more
+        a thousand impressions cost than the rate the campaign was booked at.</p>
+      <div class="pbody"><div class="ranked" id="cpmPremium"></div></div>
+    </div>
+  </section>
+
+  <!-- ============ METHOD ============ -->
+  <section class="view" id="v-method" aria-labelledby="h-method">
+    <div class="intro"><div>
+      <div class="eyebrow">Methodology</div>
+      <h1 id="h-method">How every number is calculated</h1>
+      <p>All data synthetic. Metrics are computed in Python, unit-tested on hand-verifiable
+         inputs, and exported; the browser only renders them.</p>
+    </div></div>
+    <div class="panel">
+      <div class="phead"><h2>The calculation, in four steps</h2></div>
+      <div class="pbody"><div class="steps" id="methodSteps"></div></div>
+    </div>
+    <div class="panel">
+      <div class="phead"><h2>Assumptions</h2>
+        <span class="phint">every figure here rests on these</span></div>
+      <div class="pbody">
+        <div class="classlegend">
+          <span><b>°</b> observed — read from the delivery records</span>
+          <span><b>·</b> calculated — arithmetic on observed values</span>
+          <span><b>~</b> modelled — rests on an assumption about the world</span>
+        </div>
+        <div id="assumptions"></div>
+      </div>
+    </div>
+  </section>
 
   <footer>
-    <span>Built by Muhammad Ahsan Sheikh &middot; Python · pandas · SQL · Chart.js</span>
+    <span>Built by Muhammad Ahsan Sheikh · Python · pandas · SQLite · vanilla JS</span>
     <nav>
       <a href="../index.html">Portfolio</a>
       <a href="https://github.com/muhammadahsan-30/ooh-campaign-analyzer" target="_blank" rel="noopener">Source</a>
     </nav>
   </footer>
-</div>
+</main>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Placement detail" hidden>
+  <button class="iconbtn dclose" id="dclose" type="button" aria-label="Close">✕</button>
+  <div id="drawerBody"></div>
+</aside>
+
 <script src="data.js"></script>
 <script src="app.js"></script>
 </body>

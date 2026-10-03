@@ -31,6 +31,15 @@ are meant to speak to:
   remainder), not drawn at random. A random draw left small markets over-weighted —
   Calgary held 1.41x its population share — which inflated their modelled reach.
 
+## Campaigns have names
+
+A campaign carries a human-readable name alongside its client, objective and dates, so
+lists read `Signal Everywhere` / `Nimbus Telecom · Product launch` rather than repeating
+the client as the headline. Names are drawn deterministically: two per industry and
+objective, picked by how many times that client has already run that objective, so
+re-running the generator never renames a campaign. They are deliberately plain trade
+names - the kind that appear on a media plan, not advertising copy.
+
 ## Rate cards are market benchmarks, not one published card
 
 Rate cards are built from published Canadian OOH pricing ranges, per four-week period,
@@ -48,7 +57,7 @@ site's rate is one draw from the band for its format:
 Rate and traffic ranges together are calibrated so the **blended CPM lands in the CAD
 8–15 band** that Canadian market data (COMMB) implies for a mixed book — Toronto
 street-level and transit around CAD 5–9, Vancouver urban bulletins CAD 10–22. The
-current dataset blends to **CAD 13.03**, on a 28-day rate period (below).
+current dataset blends to **CAD 12.92**, on a 28-day rate period (below).
 
 ### Markets are tiered
 
@@ -88,9 +97,11 @@ the days that have actually run:
 
 capped at the full amount, so a completed flight is still measured against the whole
 contract exactly as before. On this dataset the difference is not cosmetic: measured
-against the full flight, **242 of 595 placements would flag, 181 of them healthy sites**
-on live campaigns. Prorated, **61 (10.3%)** flag, and every one of the 61 also appears in
-the 242 — proration removes false positives without hiding a single real problem.
+against the full flight, **266 of 595 placements would flag, 184 of them purely because
+their flight has not finished yet**. Prorated, **82 (13.8%)** flag. The three live
+campaigns read -0.1%, -2.1% and -2.9% prorated, against -73.2%, -48.7% and -26.0%
+measured on the full booking - the difference between a readable live book and an
+unusable one.
 
 **ASSUMPTION: contracted delivery is flat across the flight.** Contracted impressions are
 generated as `daily_traffic x visibility x days`, so straight-line proration is that same
@@ -188,15 +199,15 @@ tracks the same person across CMAs.
 
 Tiering traffic and rate by market fixed the small-market problem, and measuring live
 campaigns to date rather than over their full booked flight removed most of what was
-left. What remains is one cell:
+left. What remains is two cells:
 
-**1 of 48 campaign-market pairs models above 90% reach, at 94.0%** — Toronto on the
-heaviest campaign. The cause is volume, not the tiering: the book delivers ~26
-impressions per person in Tier 1, and at `p = 0.35` the saturation curve is near its
-ceiling by that point.
+**2 of 48 campaign-market pairs model above 90% reach** — Toronto at 94.4% and Montreal
+at 90.6%, both on the heaviest campaign, and nothing exceeds 95%. The cause is volume,
+not the tiering: at that weight, and at `p = 0.35`, the saturation curve is close to its
+ceiling.
 
-In that cell **average frequency is the informative number, not reach** — the model is
-saying "this campaign hit most reachable people in Toronto, about 7 times each," and the
+In those cells **average frequency is the informative number, not reach** — the model is
+saying the campaign hit most reachable people in Toronto about 7 times each, and the
 reach figure has run out of headroom to say more.
 
 Closing the gap properly needs one of: more markets (10–12 CMAs rather than 6, so the
@@ -204,34 +215,154 @@ same spend spreads over ~24m people instead of 18m), a smaller book, or a lower 
 The first is the honest fix and is listed under "what I'd build next" rather than
 patched in by tuning a constant to hit a target.
 
-## Under-delivery is injected deliberately
+## Under-delivery is generated as an event, not a trait
 
-**Exactly 10%** of placements are generated as under-performers, with a delivery
-multiplier between 0.55 and 0.82 applied across the flight. This reflects real causes:
-sites going dark, posters being damaged, construction blocking sightlines, and digital
-screens suffering downtime.
+A placement does not under-deliver from the day it goes up. Something happens *to* it: a
+poster tears, a site goes dark, a screen drops offline. So a fault is generated with an
+**onset day**, and sometimes a repair.
 
-The 10% is drawn as a fixed sample rather than a per-placement coin flip. A 10% flip over
-~600 placements lands anywhere between 6% and 14% depending on the seed — on the previous
-seed it came out at 6.1% — and the rate written down here should be the rate the data
-actually has. On the current dataset 60 placements are injected and **61 (10.3%) flag**
-below the −5% line. Every injected one is caught, and there is exactly one false
-positive, which is worth being precise about:
+This matters for more than realism. With a flight-long multiplier there is no such thing
+as catching a problem early — it was there on day one — and "detected in flight" cannot
+be measured at all. With an onset day, the gap between a fault starting and the prorated
+variance crossing the flag line is a real number.
 
-> Placement 475 is a healthy transit shelter, 22 days into a 42-day flight, reading
-> −5.7%. Its health multiplier sits in the healthy band; it flags because daily delivery
-> noise of ±5% has not averaged out over 22 days. **This is the cost of reading a flight
-> early**: the prorated variance is noisier the fewer days have run, and the −5% line is
-> a hard cliff that does not widen to account for it. A production version would widen
-> the threshold when few days have elapsed — a confidence interval on the daily noise
-> rather than a fixed line. Here it stays fixed because a fixed line is explainable and
-> the false-positive rate it produces is 1 in 595.
+| Parameter | Value |
+|---|---|
+| Placements that develop a fault | 20%, drawn as a fixed sample rather than a per-placement coin flip |
+| Where in the flight a fault begins | uniformly between 10% and 90% of the booked flight |
+| Share of plan delivered while broken | 45–80%, with ±6% daily variation on top |
+| Faults repaired before the flight ends | 55%, after 5–21 days |
+| Healthy daily delivery | 97–104% of plan, with ±5% estimation noise on top |
 
-Digital sites additionally get random downtime hours — about 3% of days for healthy
-placements, 12% for under-performers — which reduce that day's delivery pro rata.
+On the current dataset that is 119 faults, of which 104 began inside the reported window;
+the rest are scheduled for days a live flight has not reached yet, so those placements
+simply read healthy — which is what a live book actually looks like.
 
-Without this, every placement would deliver to plan, there would be nothing to detect,
-and the tool would have no reason to exist.
+**The two bands are deliberately separated, and the arithmetic is checked rather than
+assumed**, because the detector's threshold depends on it:
+
+    worst healthy day = 0.95 x 0.97 = 0.922 of plan
+    best fault day    = 1.05 x 0.80 x 1.06 = 0.890 of plan
+
+So the 0.90 line sits in a genuine gap. Raising the severity ceiling above 0.80 closes
+that gap and the detector starts missing fault days.
+
+Digital sites additionally get random downtime — about 3% of days when healthy, 12% while
+broken — which reduces that day's delivery pro rata.
+
+## Faults are found from delivery data, never from the generator
+
+The generator knows which placements it broke and when. **The analyzer is never told.**
+The fault plan is not written to the database, not exported, and not read by the
+interface; it exists only so `generate_data.report_detection()` can measure the detector
+against ground truth. If the analyzer could read the answer, none of the numbers below
+would mean anything.
+
+`metrics.detection_timeline()` works from the daily delivery series alone:
+
+- **Daily delivery index** = that day's verified impressions ÷ planned daily delivery.
+- **Fault onset** = the first day of the first run of **three consecutive days below
+  0.90**. Three days, because a single dark afternoon on a digital screen is not a fault.
+- **Recovery** = the first run of three consecutive days back at or above 0.95.
+- **Alert crossing** = the first day cumulative delivery falls more than 5% below
+  cumulative contracted-to-date — the same −5% line used everywhere else, applied day by
+  day instead of once.
+
+On the current dataset the detector recovers **102 of the 104 faults that began (98.1%)**,
+with a **median error of 0 days** in the onset date.
+
+### Three layers, and what each one is allowed to see
+
+Keeping these separate is the whole reason the detection figures mean anything.
+
+| Layer | What it holds | Who may read it |
+|---|---|---|
+| **Generator truth** | Which placements were broken, on which day, how badly, and whether they were repaired | `generate_data.py` only, and only to score the detector in `report_detection()`. Never written to `ooh.db`. |
+| **Analyzer observations** | What `metrics.py` can infer from delivery rows: onset day, recovery, alert crossing, delivery index | The metrics layer and the export |
+| **UI output** | Derived analytical values only — variance, shortfall, exposure, pacing, detection delay | The browser |
+
+**A real OOH campaign does not come with fault labels.** Nobody hands an agency a list
+saying "site 14 went dark on 17 August". That is exactly why the detector is built to
+work without them: the evaluation above measures whether delivery problems are
+*recoverable from delivery data*, which is the only thing that would transfer to real
+inventory. If the analyzer could read the generator's answer, the 98.1% would be a
+tautology rather than a result.
+
+## Detection delay against reconciliation delay
+
+Two numbers, both derived from the above:
+
+    detection delay      = alert crossing day - fault onset day
+    reconciliation delay = end of flight - fault onset day
+
+The first is when this tool would have shown the problem. The second is when an
+end-of-campaign reconciliation would have found it by hand. On the current dataset the
+medians are **2.5 days against 31 days**, with a median of **38 days of flight still
+remaining** when a placement was flagged.
+
+That gap is the entire argument for the tool, which is why it is computed rather than
+asserted.
+
+## Gross shortfall and net shortfall are different numbers
+
+A campaign-level variance nets over-delivery against under-delivery. Both are reported
+everywhere, because they answer different questions:
+
+    gross   = sum of shortfalls on placements that are behind
+    offset  = sum of over-delivery on placements that are ahead
+    net     = gross - offset
+    masking = offset / gross
+
+Over-delivery on one site does not repair a dark site on another — the advertiser still
+did not get what they bought, in the place they bought it — so **gross is the operational
+figure and net is the accounting figure.**
+
+On the current dataset the whole book reads **−2.1% net** while carrying **10.5m
+impressions of gross shortfall across 227 placements**, with **14% of it masked**. Per
+campaign the masking runs from 7% to 81%.
+
+## Preventable exposure is modelled, and is not the same as billed shortfall
+
+Two money figures, which the interface never adds together:
+
+- **Billed shortfall** — impressions already missed, priced at the placement's contracted
+  CPM. Money already spent on delivery that did not happen.
+- **Preventable exposure** — what *further* media value accrues over the remaining flight
+  if a live issue is not fixed. Money not yet lost.
+
+**ASSUMPTION: preventable exposure assumes the placement keeps running at its current
+rate.** For a placement still inside an unrepaired fault, "current rate" is the
+fault-period delivery index, not the cumulative one — a site that ran healthy for three
+weeks and has been dark for four days has a cumulative index near 1.0, which says nothing
+about how fast it is losing impressions today. It is a statement about the future, so it
+is labelled modelled wherever it appears.
+
+## Required recovery pace states what recovery would take, not that it will happen
+
+    required daily = (contracted - verified) / days remaining
+    recovery pace  = required daily / planned daily
+
+A recovery pace of 1.68 means "168% of the daily delivery this placement was planned for,
+every remaining day". A healthy face in this model delivers 96–105% of plan and has no
+mechanism to run 68% hot, so a pace much above 1.05 means the gap closes with added
+weight or a make-good, not by catching up. The interface says so in those words rather
+than implying recovery is available.
+
+## Inventory reliability reports a null result
+
+Sites are rebooked across campaigns — each appears in 2 to 8 — so "does this site deliver
+when we book it?" is answerable. Whether the answer carries information is tested rather
+than assumed.
+
+**12 sites were flagged on two or more campaigns. If every booking independently carried
+the overall 13.8% flag rate, 17.2 would be expected by chance alone.** Repeat
+under-delivery is therefore no more common than chance, which is exactly right: the
+generator gives no site a persistent quality, so there is no site-level signal to find.
+
+The inventory view presents a delivery history and states that comparison, rather than
+ranking 120 sites as though the order meant something. Making it a real signal needs a
+latent site-quality term in the generator, which is listed under what comes next rather
+than implied by the interface.
 
 ## CPM uses verified, not contracted, impressions
 
@@ -283,7 +414,7 @@ makes a twelve-week buy look three times heavier than a four-week one bought at 
 weight — the opposite of what the number is for. Across markets it is summed as
 impressions over combined population, which is the population-weighted average of the
 per-market showing levels; averaging the percentages directly would over-weight small
-markets. The eight campaigns here run between #5 and #7.
+markets. The eight campaigns here run between #5 and #7, at modelled reach of 35-86%.
 
 ## What this tool does not do
 
@@ -295,5 +426,13 @@ markets. The eight campaigns here run between #5 and #7.
   comparable (above).
 - No demographic targeting. Reach is against total CMA population, not against a target
   audience, so a campaign aimed at 18–34s would report a much smaller true reach.
-- No distinction between make-goods and cash credits. "Spend at risk" is exposure, not a
+- No distinction between make-goods and cash credits. Billed shortfall is exposure, not a
   refund forecast.
+- No persistent site quality, so inventory reliability is a delivery history rather than
+  a predictive ranking, and the view reports that null result (above).
+- **No forecasting.** Preventable exposure extends the current rate over the remaining
+  flight; it is not a prediction of where the campaign lands, and no projection line is
+  drawn on any chart.
+- **No anomaly detection beyond a stated rule.** Faults are found with a fixed,
+  hand-checkable rule — three consecutive days below 90% of plan — not a learned model.
+  It is explainable out loud, which is the point.

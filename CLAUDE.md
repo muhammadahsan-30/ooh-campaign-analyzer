@@ -10,6 +10,13 @@ against the full booked flight. Do not remove or bypass that — without it the
 tool only works on campaigns that are already over, and the word "continuously"
 becomes false.
 
+The product thesis, which every change should serve:
+
+> An OOH campaign performance analyzer that measures every placement against the
+> impressions contracted by today, surfaces under-delivery that campaign-level
+> reporting hides, prices it in media value, and separates what can still be
+> fixed in flight from what has to be reconciled after it.
+
 ## Context
 
 This is a **portfolio project**. The owner is a first-year Honours Mathematics and
@@ -39,21 +46,39 @@ interview** — not to look impressive at the cost of being explainable.
   explain it.
 - **Python computes, the browser renders.** Metrics are computed in Python and
   exported to `public/data.js` / `public/data.json`. Do not move any calculation
-  into JavaScript. `public/app.js` is presentation only.
+  into JavaScript. `public/app.js` is presentation only — formatting and chart
+  geometry, never a business metric.
+- **The analyzer never reads the generator's fault log.** `generate_data.py`
+  knows which placements it broke and when. That plan is not written to the
+  database, not exported, and not read by the interface. Faults are recovered
+  from the daily delivery series by `metrics.detection_timeline()`. If the
+  analyzer could read the answer, the detection figures would prove nothing.
+- **Gross and net shortfall are both reported.** Campaign variance nets
+  over-delivery against under-delivery and hides real problems; gross counts only
+  the placements that are behind. Never show one without the other.
+- **No forecasting, no learned anomaly detection.** Faults are found with a fixed
+  hand-checkable rule. Preventable exposure extends the current rate and is
+  labelled modelled. No projection lines on charts.
+- **No Watch tier.** A -5% to -2% band was tested and contains 128 placements and
+  zero real faults. Do not reintroduce it. See `docs/product-audit.md` §3.1.
 
 ## Architecture
 
 ```
 src/generate_data.py   synthetic data -> SQLite (data/ooh.db), fixed seed
 src/schema.sql         4 normalized tables, enforced foreign keys
-src/metrics.py         prorated delivery variance, spend to date, CPM, rate efficiency,
-                       daily showing level, reach/frequency
-                       each function takes a DataFrame, returns a DataFrame, does one thing
+src/metrics.py         prorated delivery variance, spend to date, gross/net shortfall,
+                       pacing and recovery pace, media-value exposure, in-flight fault
+                       detection, CPM, rate efficiency, daily showing level, reach/frequency
+                       each function does one thing and is unit-tested by hand
 src/export_json.py     loads the DB, runs metrics.py, writes public/data.json AND public/data.js
 src/queries.sql        standalone analytical SQL (CTEs, ROW_NUMBER/LAG window functions)
 public/                static dashboard: index.html + style.css + app.js + data.js
+                       seven views, light/dark themes, no framework and no chart library
 tests/test_metrics.py  unit tests on hand-verifiable inputs (pytest)
 docs/assumptions.md    every modelling assumption, written down
+docs/product-audit.md  why each component exists, and why some were cut
+docs/design-spec.md    the visual specification the interface implements
 ```
 
 Data flow: `generate_data.py` -> `data/ooh.db` -> `export_json.py` (via `metrics.py`)
@@ -69,9 +94,9 @@ payload for anything that prefers a fetch.
 | Table | Holds |
 |---|---|
 | `sites` | Inventory: city, area, format, size, daily traffic, rate card |
-| `campaigns` | Client, industry, objective, flight dates, budget |
+| `campaigns` | Name, client, industry, objective, flight dates, budget |
 | `placements` | campaign x site x date window, negotiated rate, contracted impressions |
-| `delivery` | Per placement per day: estimated impressions, verified impressions, downtime hours |
+| `delivery` | Per placement per day: estimated impressions, verified impressions, downtime hours. Faults have an onset day and sometimes a repair, so delivery is state-dependent rather than a flight-long multiplier |
 
 ## Rebuild the data and dashboard
 
@@ -81,7 +106,7 @@ Python 3.10+. From this directory:
 pip install -r requirements.txt      # pandas, pytest
 python src/generate_data.py          # builds data/ooh.db
 python src/export_json.py            # writes public/data.json and public/data.js
-python -m pytest tests/ -q           # 19 tests
+python -m pytest tests/ -q           # 41 tests
 cd public && python -m http.server 8000   # view locally
 ```
 

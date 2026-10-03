@@ -183,3 +183,198 @@ def test_spend_over_a_full_flight_is_the_rate_times_periods():
                                       start=TWELVE_WEEK["start"], end=TWELVE_WEEK["end"]),
                             negotiated_rate=2_800)])
     assert m.spend_to_date(df, as_of="2026-06-01").iloc[0]["spend"] == 8_400.0
+
+
+# --- in-flight fault detection -------------------------------------------------
+# Every series below is planned at 100 impressions a day, so a day's delivery IS
+# its index in percent and the arithmetic can be checked by eye.
+
+PLANNED = 100
+
+
+def test_daily_index_is_delivery_against_that_days_plan():
+    assert m.daily_delivery_index([100, 50, 0], PLANNED) == [1.0, 0.5, 0.0]
+
+
+def test_daily_index_of_a_placement_planned_for_nothing_is_empty():
+    assert m.daily_delivery_index([100, 50], 0) == []
+
+
+def test_a_healthy_placement_has_no_fault_and_no_alert():
+    t = m.detection_timeline([100] * 20, PLANNED, flight_days=20)
+    assert t["observed_onset_day"] is None
+    assert t["alert_day"] is None
+    assert t["recovered"] is False
+
+
+def test_one_bad_day_is_not_a_fault():
+    # A digital screen dark for an afternoon. Three consecutive days are needed.
+    series = [100] * 5 + [0] + [100] * 5
+    assert m.fault_onset_day(m.daily_delivery_index(series, PLANNED)) is None
+
+
+def test_two_bad_days_are_still_not_a_fault():
+    series = [100] * 5 + [50, 50] + [100] * 5
+    assert m.fault_onset_day(m.daily_delivery_index(series, PLANNED)) is None
+
+
+def test_three_bad_days_are_a_fault_and_onset_is_the_first_of_them():
+    series = [100] * 5 + [50, 50, 50] + [100] * 5
+    assert m.fault_onset_day(m.daily_delivery_index(series, PLANNED)) == 5
+
+
+def test_alert_crosses_when_cumulative_delivery_falls_below_the_line():
+    # Three full days then three dark ones: by day 3 cumulative is 300 against
+    # 400 expected, which is -25% and well past the -5% line.
+    assert m.alert_crossing_day([100, 100, 100, 0, 0, 0], PLANNED) == 3
+
+
+def test_alert_does_not_cross_on_normal_variation():
+    # Every day within 4% of plan never puts cumulative delivery past -5%.
+    assert m.alert_crossing_day([96, 104, 97, 103, 98] * 4, PLANNED) is None
+
+
+def test_fault_then_repair_is_recorded_as_recovered():
+    # Healthy 5 days, broken 5, repaired for the remaining 10.
+    t = m.detection_timeline([100] * 5 + [50] * 5 + [100] * 10, PLANNED, flight_days=20)
+    assert t["observed_onset_day"] == 5
+    assert t["recovery_day"] == 10
+    assert t["recovered"] is True
+    assert t["pre_fault_index"] == 1.0
+    assert t["fault_index"] == 0.5
+
+
+def test_detection_delay_is_measured_against_reconciliation():
+    # The whole claim in one test. Fault starts on day 10 of a 20-day flight.
+    # Cumulative delivery crosses -5% on day 11 -- one day later. End-of-campaign
+    # reconciliation would not have found it for another 10 days.
+    t = m.detection_timeline([100] * 10 + [50] * 10, PLANNED, flight_days=20)
+    assert t["observed_onset_day"] == 10
+    assert t["alert_day"] == 11
+    assert t["detection_delay_days"] == 1
+    assert t["reconciliation_delay_days"] == 10
+    # 20-day flight, flagged at the close of day 11: 8 days left to act in.
+    assert t["days_remaining_at_detection"] == 8
+
+
+def test_a_late_fault_can_be_real_without_crossing_the_alert_line():
+    # Broken for the last three days of a 40-day flight: a genuine fault, but
+    # cumulative delivery is only 1.1% behind, so it is not an alert. Real
+    # problems that are too small to flag have to stay too small to flag.
+    t = m.detection_timeline([100] * 37 + [50] * 3, PLANNED, flight_days=40)
+    assert t["observed_onset_day"] == 37
+    assert t["alert_day"] is None
+    assert t["detection_delay_days"] is None
+
+
+def test_a_fault_from_day_one_has_no_pre_fault_period():
+    t = m.detection_timeline([50] * 20, PLANNED, flight_days=20)
+    assert t["observed_onset_day"] == 0
+    assert t["pre_fault_index"] is None
+    assert t["fault_index"] == 0.5
+
+
+# --- shortfall decomposition, pacing and exposure ------------------------------
+
+def test_gross_shortfall_is_not_reduced_by_over_delivery_elsewhere():
+    # Two placements, each contracted 1000 to date. One delivers 600 (400 short),
+    # the other 1200 (200 over). Net is -200, which reads as -10% and looks mild.
+    # Gross is 400: that is the shortfall an advertiser actually experienced, and
+    # 50% of it is masked by the other site running hot.
+    df = pd.DataFrame([{"contracted_to_date": 1000, "verified_impressions": 600},
+                       {"contracted_to_date": 1000, "verified_impressions": 1200}])
+    d = m.shortfall_decomposition(df)
+    assert d["gross_shortfall"] == 400
+    assert d["over_delivery_offset"] == 200
+    assert d["net_shortfall"] == 200
+    assert d["masking_pct"] == 50.0
+    assert d["placements_behind"] == 1
+    assert d["variance_pct"] == -10.0
+
+
+def test_a_fully_healthy_book_has_no_shortfall_and_no_masking():
+    df = pd.DataFrame([{"contracted_to_date": 1000, "verified_impressions": 1000}])
+    d = m.shortfall_decomposition(df)
+    assert d["gross_shortfall"] == 0
+    assert d["masking_pct"] == 0.0
+    assert d["placements_behind"] == 0
+
+
+def test_recovery_pace_is_what_finishing_whole_would_take():
+    # 10-day flight, 1000 contracted, so 100 a day planned. Five days in, only
+    # 300 delivered against 500 expected. 700 is still owed over 5 remaining
+    # days = 140 a day, which is 1.4x the planned 100.
+    df = pd.DataFrame([placement(contracted=1000, verified=300)])
+    row = m.pacing(df, as_of="2026-01-05").iloc[0]
+    assert row["elapsed_days"] == 5
+    assert row["remaining_days"] == 5
+    assert row["planned_daily"] == 100
+    assert row["remaining_contracted"] == 700
+    assert row["required_daily"] == 140
+    assert row["recovery_pace"] == 1.4
+    assert row["delivery_index"] == 0.6
+
+
+def test_a_placement_on_plan_needs_exactly_its_planned_daily_delivery():
+    # Delivered exactly to plan: recovery pace is 1.0, i.e. carry on as booked.
+    df = pd.DataFrame([placement(contracted=1000, verified=500)])
+    row = m.pacing(df, as_of="2026-01-05").iloc[0]
+    assert row["delivery_index"] == 1.0
+    assert row["recovery_pace"] == 1.0
+
+
+def test_a_closed_flight_has_no_recovery_pace():
+    # Nothing left to recover in; the number would be a division by zero.
+    df = pd.DataFrame([placement(contracted=1000, verified=900)])
+    row = m.pacing(df, as_of="2026-01-11").iloc[0]
+    assert row["remaining_days"] == 0
+    assert pd.isna(row["required_daily"])
+    assert pd.isna(row["recovery_pace"])
+
+
+def test_billed_shortfall_is_priced_at_the_contracted_rate():
+    # Five days into a 10-day flight: 500 contracted to date, 300 delivered,
+    # 200 short. Spend to date is CAD 50, so contracted CPM is
+    # 50 / 500 * 1000 = CAD 100 per thousand, and 200 short is worth CAD 20.
+    df = pd.DataFrame([dict(placement(contracted=1000, verified=300), spend=50.0)])
+    row = m.exposure(df, as_of="2026-01-05").iloc[0]
+    assert row["shortfall"] == 200
+    assert row["contracted_cpm"] == 100.0
+    assert row["billed_shortfall"] == 20.0
+
+
+def test_preventable_exposure_prices_the_rest_of_the_flight():
+    # Same placement. It is running at 0.6 of plan, so it loses 40 impressions
+    # a day against a planned 100. Five days remain, so 200 more impressions
+    # are at stake, worth another CAD 20 at the same contracted CPM.
+    df = pd.DataFrame([dict(placement(contracted=1000, verified=300), spend=50.0)])
+    row = m.exposure(df, as_of="2026-01-05").iloc[0]
+    assert row["daily_bleed"] == 40.0
+    assert row["preventable_exposure"] == 20.0
+
+
+def test_a_closed_flight_has_nothing_left_to_prevent():
+    df = pd.DataFrame([dict(placement(contracted=1000, verified=900), spend=100.0)])
+    row = m.exposure(df, as_of="2026-01-11").iloc[0]
+    assert row["billed_shortfall"] == 10.0     # 100 short at CAD 100 per thousand
+    assert row["preventable_exposure"] == 0.0
+
+
+def test_exposure_prices_the_rest_of_the_flight_on_the_current_rate():
+    # A placement that ran healthy then broke. Cumulative delivery is 450 of 500
+    # expected -- only 10% behind -- but it is currently running at 50% of plan.
+    # Pricing the remaining 5 days on the cumulative 0.9 would understate the
+    # bleed fivefold: 10 a day instead of 50.
+    df = pd.DataFrame([dict(placement(contracted=1000, verified=450), spend=50.0)])
+    cumulative = m.exposure(df, as_of="2026-01-05").iloc[0]
+    current = m.exposure(df, as_of="2026-01-05", current_index=[0.5]).iloc[0]
+    assert round(cumulative["daily_bleed"], 6) == 10.0
+    assert round(current["daily_bleed"], 6) == 50.0
+    # 50 a day x 5 remaining days = 250 impressions at CAD 100 per thousand.
+    assert round(current["preventable_exposure"], 6) == 25.0
+
+
+def test_exposure_falls_back_to_the_cumulative_rate_when_none_is_given():
+    df = pd.DataFrame([dict(placement(contracted=1000, verified=450), spend=50.0)])
+    assert (m.exposure(df, as_of="2026-01-05", current_index=[None]).iloc[0]["daily_bleed"]
+            == m.exposure(df, as_of="2026-01-05").iloc[0]["daily_bleed"])

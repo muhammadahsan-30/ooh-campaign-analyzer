@@ -23,14 +23,15 @@ CREATE TABLE sites (
 );
 
 CREATE TABLE campaigns (
-    campaign_id  INTEGER PRIMARY KEY,
-    client_name  TEXT NOT NULL,
-    industry     TEXT NOT NULL CHECK (industry IN
-                   ('FMCG','telecom','QSR','automotive','banking','retail')),
-    objective    TEXT NOT NULL CHECK (objective IN ('awareness','product_launch','retail_drive')),
-    start_date   TEXT NOT NULL,
-    end_date     TEXT NOT NULL,
-    budget       INTEGER NOT NULL          -- CAD
+    campaign_id   INTEGER PRIMARY KEY,
+    campaign_name TEXT NOT NULL,           -- the name the campaign is known by
+    client_name   TEXT NOT NULL,
+    industry      TEXT NOT NULL CHECK (industry IN
+                    ('FMCG','telecom','QSR','automotive','banking','retail')),
+    objective     TEXT NOT NULL CHECK (objective IN ('awareness','product_launch','retail_drive')),
+    start_date    TEXT NOT NULL,
+    end_date      TEXT NOT NULL,
+    budget        INTEGER NOT NULL         -- CAD
 );
 
 CREATE TABLE placements (
