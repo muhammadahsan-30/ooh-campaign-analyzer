@@ -31,6 +31,14 @@ Three pages, specified visual by visual. Pair this with
 Conditional formatting: card 1 font red when `Delivery Variance % < 0`.
 **Question answered:** is the book healthy, and what is the headline hiding?
 
+### Row 1b — campaign slicer
+
+- **Visual:** Slicer · **Field:** `dim_campaign[campaign_name]` · Style: dropdown
+- **Why it is here:** without it, the waterfall and the matrix below merely reproduce
+  visuals the web app already has. With it, every figure on the page recomputes for any
+  campaign selection — which is the thing a static dashboard cannot do and the reason this
+  page is worth building. Leave visual interactions ON throughout.
+
 ### Row 2 — waterfall: gross → offset → net
 
 - **Visual:** Waterfall chart
@@ -63,12 +71,12 @@ Conditional formatting: card 1 font red when `Delivery Variance % < 0`.
 - **Expected finding:** Toronto is non-zero on 8 of 8 campaigns
 - **Question answered:** systemic or isolated?
 
-### Row 5 — live vs completed
+### Removed during blueprint QA
 
-- **Visual:** Stacked bar, single bar
-- **Values:** `Live Issues`, `Completed Shortfalls`
-- **Title:** *21 still actionable · 61 for reconciliation*
-- **Question answered:** how much can still be acted on?
+A stacked bar of `Live Issues` vs `Completed Shortfalls` was specified here and has been
+**cut**. It encodes two numbers — 21 and 61 — and a chart of two numbers communicates
+nothing a pair of cards does not, while spending a row of the most valuable page. The
+live/completed split is a web-app workflow concept and it is already told there properly.
 
 ---
 
@@ -147,9 +155,15 @@ Card 3 covers the 23 of those still in flight.*
 
 - **Visual:** Line chart
 - **X:** `dim_date[date]`
-- **Y:** a running total of `Verified Impressions`, and a running total of planned delivery
+- **Y:** `Cumulative Verified` and `Cumulative Contracted` — both defined in
+  `bi/dax_measures.txt` tier 4. The blueprint originally said "a running total" without
+  specifying how; that gap is now closed.
 - Filter the page to one campaign via a slicer (`dim_campaign[campaign_name]`), default
   *Signal Everywhere* — it is live, 84 days, and has a detected fault that recovered
+- ⚠️ `Cumulative Contracted` **requires the single-campaign filter**. Every placement in a
+  campaign shares its flight window, which is what makes days × planned-per-day valid.
+  Expected final points with that selection: **59,392,728** verified against
+  **61,151,454** contracted, a gap of **1,758,726**.
 - **Title:** *Cumulative delivery against what was contracted*
 - ⚠️ One y-axis only. Both series are impressions.
 

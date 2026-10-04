@@ -56,10 +56,40 @@ No navigation change. No homepage change beyond one stack chip (below).
 Use the existing `.shot` frame with a `figcaption`. Images go in `assets/` on the
 portfolio repo, copied from `docs/screenshots/` as the analyzer screenshots already are.
 
+### Capture specification
+
+| Artifact | Capture at | Crop | Notes |
+|---|---|---|---|
+| `pbi-01-executive.png` | **1600 × 1000** | Full page, including the synthetic-data footnote | The portfolio renders at 760px CSS width, so 1600 gives a clean 2× for retina. Do not crop the footnote out — it is the disclosure |
+| `pbi-02-rootcause.png` | **1600 × 1000** | Full page | Capture with the tree **expanded two or three levels**, not at its root. A collapsed tree looks like an empty visual |
+| `pbi-03-detection.png` | **1600 × 900** | Full page | Optional; only if a third still earns its place |
+| `pbi-decomposition.gif` | **1200 × 750** | Crop to the tree itself, not the whole page | 6–10 seconds, ≤ 4 MB, no cursor trail. Drill exposure → campaign → market → format, pausing ~1s per level so it is readable |
+
+Export each page with Power BI's own **Export → PDF** as a backup if screen capture gives
+poor text rendering, then crop the PDF page to PNG.
+
+All four are **lazy-loaded** and sit below the fold, so file size is less critical than
+legibility. Prefer sharp over small.
+
+**Alt text** must describe what the visual shows, not that it is a screenshot — e.g.
+*"The decomposition tree breaking media-value exposure down by campaign, then market,
+then format."*
+
 **Links row:** `[Open the report ↗]` *(only if Publish to web worked)* ·
 `[Semantic model & DAX ↗]` → the `docs/` folder on GitHub.
-If there is no public link, drop the first button entirely. **Never ship a link that
-asks a recruiter to sign in.**
+
+### If Publish to web is unavailable — exactly what changes
+
+| Element | With a public link | Without |
+|---|---|---|
+| `[Open the report ↗]` button | First in the links row, `btn primary` | **Remove entirely.** Do not disable it, do not leave it greyed, do not link to a sign-in page |
+| `[Semantic model & DAX ↗]` | Second | Becomes the only button, promoted to `btn primary` |
+| Closing sentence of the copy | — | Append: *"The report runs in Power BI Service; the model, measures and validation are public here."* |
+| GIF | Supporting | **Becomes the primary artifact** — it is now the only way a reader sees the thing move. Place it first, full width |
+| Everything else | unchanged | unchanged |
+
+**Never ship a link that asks a recruiter to sign in.** A dead link costs more credibility
+than a missing one, and the GIF carries the demonstration on its own.
 
 **Stack chips to add:** `Power BI` · `DAX` · `Star schema` — to this section only, not to
 the page header.
