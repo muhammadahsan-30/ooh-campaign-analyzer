@@ -1,0 +1,28 @@
+measure,expected_value,population,python_match,sql_match,notes
+Total Spend,5408750.68,all placements (595),Y,Y,
+Contracted Impressions,518781947,all placements — FULL flight,Y,-,not the to-date denominator
+Contracted To Date,427728324.43,all placements (595),Y,Y,
+Verified Impressions,418677830,all placements (595),Y,Y,
+Delivery Variance %,-2.12,all placements (595),Y,Y,format as %
+Blended CPM,12.92,all placements (595),Y,-,never split by media_type
+Gross Shortfall,10532493.20,placements behind (227),Y,Y,
+Over-delivery Offset,1481998.77,placements ahead (367),Y,Y,
+Net Shortfall,9050494.43,all placements (gross − offset),Y,Y,
+Masked Shortfall %,14.07,offset ÷ gross,Y,Y,format as %
+Placements,595,all placements (595),Y,Y,
+Placements Behind,227,behind by ANY amount (227),Y,Y,
+Flagged Placements,82,past the −5% line (82),Y,Y,
+Live Issues,21,flagged AND in flight (21),Y,N,status derived in Python
+Completed Shortfalls,61,flagged AND closed (61),Y,N,status derived in Python
+Campaigns Affected,8,distinct campaigns with ≥1 flagged,Y,-,
+Markets Affected,6,distinct cities with ≥1 flagged,Y,-,
+Total Negative Delivery Exposure,134655.35,placements behind (227),Y,Y,NOT the flagged measure
+Flagged Media-Value Exposure,117057.70,past the −5% line (82),Y,Y,NOT the total measure
+Preventable Exposure,36254.56,live issues only (21),Y,-,MODELLED — never add to the above
+Detection Events,102,detected faults (102),Y,-,Python-only: run-based
+Alerted Events,90,detected AND alerted (90),Y,-,Python-only: run-based
+Faults Recovered,32,detected faults that recovered (32),Y,-,Python-only: run-based
+Median Detection Delay,4.00,alerted events (90),Y,-,Python-only: run-based
+Median Reconciliation Delay,31.00,alerted events (90),Y,-,Python-only: run-based
+Median Days Remaining at Detection,35.00,alerted AND in flight (23),Y,-,TWO filters required
+Avg Detection Delay,4.82,alerted events (90),Y,-,prefer median on cards
