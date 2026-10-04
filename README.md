@@ -233,12 +233,32 @@ The charts are hand-built SVG and CSS rather than a charting library, which keep
 payload small and gives exact control over the mark specifications the design system
 sets.
 
+### Power BI companion — model prepared, report authoring pending
+
+A BI export layer ships alongside the dashboard: `bi/` holds a six-table star schema
+(three dimensions, three facts) written by `src/export_bi.py` from the same database and
+the same `metrics.py` functions the web app uses, so both surfaces are fed by one pipeline
+and one set of definitions.
+
+`src/validate_bi.py` reproduces ten business metrics independently in Python and SQL and
+writes `bi/validation_expected.csv` with the value each DAX measure must return, the
+population it covers, and a tolerance. **No Power BI report exists yet** — the semantic
+model, DAX, page design and build steps are specified in `docs/`, and the report will be
+authored in Power BI Service.
+
+Sequential logic — fault onset, alert crossing, recovery runs, detection delay — stays
+precomputed in Python and is exported as facts. Only additive and ratio measures are
+reproduced in DAX. The generator's fault plan is evaluation-only and is never exported.
+
 ```
 src/generate_data.py   synthetic data -> SQLite, fixed seed; faults have onset dates
 src/schema.sql         4 tables (sites, campaigns, placements, delivery), foreign keys
 src/metrics.py         every metric, one function each, all unit-tested
 src/export_json.py     runs the metrics, validates, writes public/data.{json,js}
 src/queries.sql        standalone analytical SQL (CTEs, ROW_NUMBER / LAG window functions)
+src/export_bi.py       star-schema CSVs for the Power BI companion
+src/validate_bi.py     Python / SQL cross-validation -> bi/validation_expected.csv
+bi/                    six BI tables + the validation table
 public/                static dashboard — no server, no build step, no framework
 tests/test_metrics.py  41 tests on hand-verifiable inputs
 docs/assumptions.md    every modelling assumption, written down
