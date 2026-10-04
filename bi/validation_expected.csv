@@ -1,0 +1,13 @@
+metric,python_value,sql_value,expected_powerbi_value,population_definition,tolerance,status
+Total spend,5408750.68,5408750.68,5408750.68,all placements,0.01,MATCH
+Verified impressions to date,418677830.0,418677830.0,418677830.0,all placements,1.0,MATCH
+Contracted to date,427728324.43,427728324.43,427728324.43,all placements,1.0,MATCH
+Gross shortfall,10532493.2,10532493.2,10532493.2,every placement delivering under contract to date,1.0,MATCH
+Over-delivery offset,1481998.77,1481998.77,1481998.77,every placement delivering above contract to date,1.0,MATCH
+Net shortfall,9050494.43,9050494.43,9050494.43,all placements (gross minus offset),1.0,MATCH
+Total negative delivery exposure,134655.35,134655.35,134655.35,every placement delivering under contract to date -- NOT the same as the flagged measure below,0.01,MATCH
+Flagged media-value exposure,117057.7,117057.7,117057.7,placements breaching the -5% attention line -- NOT the same as the total above,0.01,MATCH
+Flagged placement count,82.0,82.0,82.0,placements breaching the -5% attention line,0.0,MATCH
+Placements behind,227.0,227.0,227.0,every placement delivering under contract to date,0.0,MATCH
+Live issues,21.0,,21.0,flagged placements still in flight; status is derived in Python,0.0,PYTHON ONLY
+Completed shortfalls,61.0,,61.0,flagged placements whose flight has closed; derived in Python,0.0,PYTHON ONLY

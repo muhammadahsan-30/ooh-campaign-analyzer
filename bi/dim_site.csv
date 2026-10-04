@@ -1,0 +1,121 @@
+site_id,city,area,format,is_digital,daily_traffic,rate_card_monthly,format_label,media_type
+1,Toronto,Gardiner Expressway,transit_shelter,0,15314,2100,Transit shelter,Static
+2,Toronto,Scarborough,transit_shelter,0,10848,2600,Transit shelter,Static
+3,Toronto,Gardiner Expressway,digital_screen,1,101237,20400,Digital screen,Digital
+4,Toronto,Scarborough,bulletin,0,47493,7400,Bulletin,Static
+5,Toronto,Yonge & Dundas,digital_screen,1,55926,19000,Digital screen,Digital
+6,Toronto,King West,bulletin,0,26698,6400,Bulletin,Static
+7,Toronto,Scarborough,digital_screen,1,69671,15900,Digital screen,Digital
+8,Toronto,Yorkville,transit_shelter,0,10582,2500,Transit shelter,Static
+9,Toronto,King West,bulletin,0,57837,7200,Bulletin,Static
+10,Toronto,King West,transit_shelter,0,10614,2800,Transit shelter,Static
+11,Toronto,Yorkville,bulletin,0,61660,8600,Bulletin,Static
+12,Toronto,King West,bulletin,0,65994,6200,Bulletin,Static
+13,Toronto,Gardiner Expressway,transit_shelter,0,13354,2400,Transit shelter,Static
+14,Toronto,Scarborough,digital_screen,1,63785,18200,Digital screen,Digital
+15,Toronto,Yonge & Dundas,mall_panel,0,15336,2100,Mall panel,Static
+16,Toronto,Scarborough,bulletin,0,67049,8200,Bulletin,Static
+17,Toronto,Yorkville,bulletin,0,29363,7800,Bulletin,Static
+18,Toronto,King West,bulletin,0,68956,9100,Bulletin,Static
+19,Toronto,Gardiner Expressway,mall_panel,0,21696,2200,Mall panel,Static
+20,Toronto,Gardiner Expressway,bulletin,0,61120,6900,Bulletin,Static
+21,Toronto,Yorkville,mall_panel,0,17504,2300,Mall panel,Static
+22,Toronto,Yonge & Dundas,digital_screen,1,50014,19900,Digital screen,Digital
+23,Toronto,Yonge & Dundas,transit_shelter,0,17617,2400,Transit shelter,Static
+24,Toronto,King West,bulletin,0,52806,7100,Bulletin,Static
+25,Toronto,King West,digital_screen,1,118748,19700,Digital screen,Digital
+26,Toronto,Gardiner Expressway,transit_shelter,0,25674,2700,Transit shelter,Static
+27,Toronto,King West,mall_panel,0,21010,1700,Mall panel,Static
+28,Toronto,King West,bulletin,0,35692,6100,Bulletin,Static
+29,Toronto,Yonge & Dundas,bulletin,0,67966,9600,Bulletin,Static
+30,Toronto,Gardiner Expressway,mall_panel,0,9207,2400,Mall panel,Static
+31,Toronto,Scarborough,digital_screen,1,114507,19000,Digital screen,Digital
+32,Toronto,Gardiner Expressway,bulletin,0,66723,8200,Bulletin,Static
+33,Toronto,Yorkville,digital_screen,1,102839,19200,Digital screen,Digital
+34,Toronto,Yonge & Dundas,bulletin,0,58555,7500,Bulletin,Static
+35,Toronto,Yonge & Dundas,transit_shelter,0,15501,2000,Transit shelter,Static
+36,Toronto,Scarborough,mall_panel,0,12798,2000,Mall panel,Static
+37,Toronto,Scarborough,transit_shelter,0,26881,2400,Transit shelter,Static
+38,Toronto,Gardiner Expressway,bulletin,0,26181,6400,Bulletin,Static
+39,Toronto,Yorkville,transit_shelter,0,31890,2000,Transit shelter,Static
+40,Toronto,Yonge & Dundas,transit_shelter,0,21193,2700,Transit shelter,Static
+41,Toronto,Gardiner Expressway,bulletin,0,32465,10000,Bulletin,Static
+42,Toronto,Yorkville,digital_screen,1,67742,16100,Digital screen,Digital
+43,Montreal,Downtown,digital_screen,1,41630,20800,Digital screen,Digital
+44,Montreal,Plateau,digital_screen,1,56798,18800,Digital screen,Digital
+45,Montreal,Downtown,digital_screen,1,56579,18600,Digital screen,Digital
+46,Montreal,Decarie,bulletin,0,38694,9100,Bulletin,Static
+47,Montreal,Old Port,transit_shelter,0,29688,2700,Transit shelter,Static
+48,Montreal,Downtown,digital_screen,1,110914,19900,Digital screen,Digital
+49,Montreal,Old Port,bulletin,0,51246,9700,Bulletin,Static
+50,Montreal,Old Port,mall_panel,0,7625,1900,Mall panel,Static
+51,Montreal,Plateau,bulletin,0,46461,6600,Bulletin,Static
+52,Montreal,Downtown,mall_panel,0,7686,2100,Mall panel,Static
+53,Montreal,Blvd Saint-Laurent,transit_shelter,0,14693,2600,Transit shelter,Static
+54,Montreal,Plateau,transit_shelter,0,30009,2600,Transit shelter,Static
+55,Montreal,Downtown,bulletin,0,20610,9400,Bulletin,Static
+56,Montreal,Downtown,transit_shelter,0,25617,2200,Transit shelter,Static
+57,Montreal,Downtown,digital_screen,1,67018,18500,Digital screen,Digital
+58,Montreal,Blvd Saint-Laurent,bulletin,0,60086,9900,Bulletin,Static
+59,Montreal,Downtown,bulletin,0,28800,7800,Bulletin,Static
+60,Montreal,Plateau,bulletin,0,37848,7900,Bulletin,Static
+61,Montreal,Blvd Saint-Laurent,transit_shelter,0,24561,2400,Transit shelter,Static
+62,Montreal,Downtown,bulletin,0,61568,9100,Bulletin,Static
+63,Montreal,Plateau,mall_panel,0,13583,1800,Mall panel,Static
+64,Montreal,Old Port,transit_shelter,0,8316,2100,Transit shelter,Static
+65,Montreal,Plateau,bulletin,0,55755,5900,Bulletin,Static
+66,Montreal,Decarie,mall_panel,0,9176,1700,Mall panel,Static
+67,Montreal,Downtown,bulletin,0,43449,7300,Bulletin,Static
+68,Montreal,Old Port,transit_shelter,0,21316,2600,Transit shelter,Static
+69,Montreal,Plateau,transit_shelter,0,13801,2900,Transit shelter,Static
+70,Montreal,Blvd Saint-Laurent,digital_screen,1,88964,21000,Digital screen,Digital
+71,Montreal,Plateau,mall_panel,0,8542,2100,Mall panel,Static
+72,Vancouver,Granville St,mall_panel,0,20083,2000,Mall panel,Static
+73,Vancouver,Granville St,bulletin,0,21550,7200,Bulletin,Static
+74,Vancouver,Broadway,digital_screen,1,81025,20800,Digital screen,Digital
+75,Vancouver,Marine Drive,digital_screen,1,78404,15700,Digital screen,Digital
+76,Vancouver,Marine Drive,bulletin,0,37397,5900,Bulletin,Static
+77,Vancouver,Broadway,bulletin,0,48599,9800,Bulletin,Static
+78,Vancouver,Broadway,bulletin,0,22908,9200,Bulletin,Static
+79,Vancouver,Granville St,bulletin,0,43869,9100,Bulletin,Static
+80,Vancouver,Marine Drive,bulletin,0,40572,6600,Bulletin,Static
+81,Vancouver,Kingsway,transit_shelter,0,18688,2400,Transit shelter,Static
+82,Vancouver,Kingsway,transit_shelter,0,29788,2300,Transit shelter,Static
+83,Vancouver,Marine Drive,transit_shelter,0,17861,2400,Transit shelter,Static
+84,Vancouver,Granville St,digital_screen,1,91346,20300,Digital screen,Digital
+85,Vancouver,Kingsway,transit_shelter,0,30138,2200,Transit shelter,Static
+86,Vancouver,Granville St,digital_screen,1,46114,17800,Digital screen,Digital
+87,Vancouver,Downtown,digital_screen,1,65784,18000,Digital screen,Digital
+88,Vancouver,Downtown,bulletin,0,36046,9500,Bulletin,Static
+89,Vancouver,Kingsway,transit_shelter,0,28636,2500,Transit shelter,Static
+90,Calgary,17th Ave SW,bulletin,0,21593,2400,Bulletin,Static
+91,Calgary,Downtown Core,transit_shelter,0,13158,1200,Transit shelter,Static
+92,Calgary,17th Ave SW,bulletin,0,13974,3200,Bulletin,Static
+93,Calgary,17th Ave SW,mall_panel,0,13442,1400,Mall panel,Static
+94,Calgary,17th Ave SW,transit_shelter,0,16845,1800,Transit shelter,Static
+95,Calgary,17th Ave SW,transit_shelter,0,7929,1800,Transit shelter,Static
+96,Calgary,Macleod Trail,mall_panel,0,8451,1600,Mall panel,Static
+97,Calgary,Deerfoot Trail,transit_shelter,0,13447,1100,Transit shelter,Static
+98,Calgary,Deerfoot Trail,transit_shelter,0,15419,1100,Transit shelter,Static
+99,Calgary,Macleod Trail,bulletin,0,39777,3000,Bulletin,Static
+100,Calgary,17th Ave SW,bulletin,0,28348,1700,Bulletin,Static
+101,Ottawa,Downtown,bulletin,0,42104,4300,Bulletin,Static
+102,Ottawa,Rideau,digital_screen,1,53952,14400,Digital screen,Digital
+103,Ottawa,Queensway,transit_shelter,0,14398,1200,Transit shelter,Static
+104,Ottawa,Bank St,bulletin,0,38301,4500,Bulletin,Static
+105,Ottawa,Queensway,transit_shelter,0,17034,1500,Transit shelter,Static
+106,Ottawa,Downtown,bulletin,0,15300,4700,Bulletin,Static
+107,Ottawa,Bank St,bulletin,0,26906,3900,Bulletin,Static
+108,Ottawa,Rideau,bulletin,0,22941,4700,Bulletin,Static
+109,Ottawa,Downtown,bulletin,0,25761,3000,Bulletin,Static
+110,Ottawa,Downtown,transit_shelter,0,19628,1000,Transit shelter,Static
+111,Edmonton,Whyte Ave,bulletin,0,21379,2200,Bulletin,Static
+112,Edmonton,Whyte Ave,digital_screen,1,57571,12100,Digital screen,Digital
+113,Edmonton,Downtown,transit_shelter,0,8019,1300,Transit shelter,Static
+114,Edmonton,Jasper Ave,bulletin,0,27597,2800,Bulletin,Static
+115,Edmonton,Whyte Ave,bulletin,0,16006,3700,Bulletin,Static
+116,Edmonton,Downtown,mall_panel,0,9826,1400,Mall panel,Static
+117,Edmonton,Anthony Henday,digital_screen,1,21994,13400,Digital screen,Digital
+118,Edmonton,Anthony Henday,mall_panel,0,12038,1600,Mall panel,Static
+119,Edmonton,Anthony Henday,bulletin,0,36218,5200,Bulletin,Static
+120,Edmonton,Anthony Henday,digital_screen,1,46347,12000,Digital screen,Digital
